@@ -7,6 +7,7 @@ import {
   Receipt,
   LineChart,
   Settings,
+  ClipboardList,
   type LucideIcon,
 } from "lucide-react";
 
@@ -21,11 +22,12 @@ export const MAIN_NAV: NavItem[] = [
   { href: "/", label: "Início", icon: Home },
   { href: "/vender", label: "Vender", icon: ShoppingCart },
   { href: "/clientes", label: "Clientes", icon: Users },
+  { href: "/fichas", label: "Fichas", icon: ClipboardList },
   { href: "/receber", label: "Receber", icon: Wallet },
   { href: "/estoque", label: "Estoque", icon: Package },
 ];
 
-// Menu secundário — aparece só na sidebar (desktop) e num menu "mais" (mobile)
+// Menu secundário — aparece na sidebar (desktop)
 export const SECONDARY_NAV: NavItem[] = [
   { href: "/despesas", label: "Despesas", icon: Receipt },
   { href: "/financeiro", label: "Financeiro", icon: Wallet },
