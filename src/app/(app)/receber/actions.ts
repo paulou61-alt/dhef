@@ -29,6 +29,8 @@ export async function registerPayment(input: {
   }
 
   revalidatePath("/receber");
+  revalidatePath("/cobrancas");
+  revalidatePath("/clientes");
   revalidatePath("/financeiro");
   revalidatePath("/relatorios");
   revalidatePath("/fichas");
