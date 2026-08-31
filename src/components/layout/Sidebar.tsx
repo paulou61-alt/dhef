@@ -6,15 +6,16 @@ import { clsx } from "clsx";
 import { LogOut } from "lucide-react";
 import { getMainNav, getSecondaryNav } from "@/lib/nav-items";
 import type { AppRole } from "@/lib/access";
+import type { ViewPermission } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/client";
 
 const ROLE_LABELS: Record<AppRole, string> = { owner: "Proprietário", vendedor: "Vendedor", cobrador: "Cobrador" };
 
-export function Sidebar({ role, displayName }: { role: AppRole; displayName?: string | null }) {
+export function Sidebar({ role, displayName, viewPermissions = [] }: { role: AppRole; displayName?: string | null; viewPermissions?: ViewPermission[] }) {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
-  const mainNav = getMainNav(role);
+  const mainNav = getMainNav(role, viewPermissions);
   const secondaryNav = getSecondaryNav(role);
 
   async function handleLogout() {
