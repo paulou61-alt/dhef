@@ -13,6 +13,14 @@ export interface CreateCollaboratorInput {
   role: "vendedor" | "cobrador";
 }
 
+export interface CollaboratorValeInput {
+  collaboratorId: string;
+  movementType: "vale" | "abatimento";
+  amount: number;
+  movementDate?: string;
+  notes?: string;
+}
+
 async function callCollaboratorManager(payload: Record<string, unknown>) {
   const supabase = createClient();
   const { data: { session } } = await supabase.auth.getSession();
@@ -90,5 +98,47 @@ export async function removeCollaborator(
   revalidatePath("/colaboradores");
   revalidatePath("/fichas");
   revalidatePath("/clientes");
+  return { success: true };
+}
+
+export async function addCollaboratorValeMovement(
+  input: CollaboratorValeInput
+): Promise<{ error?: string; success?: boolean }> {
+  const access = await getAccessContext();
+  if (!access || access.role !== "owner") {
+    return { error: "Apenas o proprietário pode movimentar vales." };
+  }
+
+  const collaboratorId = input.collaboratorId?.trim();
+  const amount = Number(input.amount);
+  const movementType = input.movementType;
+  const notes = input.notes?.trim().slice(0, 240) || null;
+
+  if (!collaboratorId) return { error: "Colaborador inválido." };
+  if (movementType !== "vale" && movementType !== "abatimento") {
+    return { error: "Tipo de movimentação inválido." };
+  }
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return { error: "Informe um valor maior que zero." };
+  }
+
+  const supabase = createClient();
+  const { error } = await supabase.from("collaborator_vale_movements").insert({
+    owner_id: access.ownerId,
+    collaborator_id: collaboratorId,
+    movement_type: movementType,
+    amount: Number(amount.toFixed(2)),
+    movement_date: input.movementDate || new Date().toISOString().slice(0, 10),
+    notes,
+  });
+
+  if (error) {
+    if (error.message.toLowerCase().includes("abatimento não pode")) {
+      return { error: "O abatimento não pode ser maior que o saldo em vale." };
+    }
+    return { error: "Não foi possível registrar a movimentação do vale." };
+  }
+
+  revalidatePath("/colaboradores");
   return { success: true };
 }
