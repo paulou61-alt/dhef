@@ -2,6 +2,7 @@ export type SaleStatus = "completed" | "pending" | "cancelled";
 export type SalePaymentMethod = "pix" | "dinheiro" | "cartao" | "fiado" | "parcelado";
 export type InstallmentStatus = "pendente" | "pago" | "vencido" | "parcial";
 export type MovementType = "entrada" | "saida" | "ajuste" | "venda" | "devolucao";
+export type CollaboratorRole = "vendedor" | "cobrador";
 
 export interface Profile {
   id: string;
@@ -12,9 +13,26 @@ export interface Profile {
   updated_at: string;
 }
 
+export interface Collaborator {
+  id: string;
+  owner_id: string;
+  auth_user_id: string | null;
+  name: string;
+  username: string;
+  email: string;
+  phone: string | null;
+  role: CollaboratorRole;
+  is_active: boolean;
+  accepted_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Customer {
   id: string;
   user_id: string;
+  ficha_number: number;
+  assigned_collaborator_id: string | null;
   name: string;
   phone: string | null;
   whatsapp: string | null;
@@ -65,6 +83,7 @@ export interface Sale {
   id: string;
   user_id: string;
   customer_id: string | null;
+  created_by_collaborator_id: string | null;
   sale_number: number;
   status: SaleStatus;
   payment_method: SalePaymentMethod;
@@ -117,6 +136,4 @@ export interface Expense {
   updated_at: string;
 }
 
-// Placeholder para satisfazer o generic do @supabase/ssr.
-// Recomendado: substituir por `supabase gen types typescript` quando o projeto estiver criado.
 export type Database = any;

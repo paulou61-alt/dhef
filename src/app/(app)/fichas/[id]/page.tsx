@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeft, MapPin, Phone, MessageCircle } from "lucide-react";
+import { ChevronLeft, MapPin, Phone, MessageCircle, UserRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { getAccessContext } from "@/lib/access";
 import { formatCurrency, formatDate, formatDateTime } from "@/utils/format";
 import { whatsappLink } from "@/utils/masks";
 
@@ -9,10 +10,17 @@ export const dynamic = "force-dynamic";
 
 export default async function FichaClientePage({ params }: { params: { id: string } }) {
   const supabase = createClient();
+  const access = await getAccessContext();
   const { data: customer } = await supabase.from("customers").select("*").eq("id", params.id).single();
   if (!customer) notFound();
 
-  const { data: sales } = await supabase.from("sales").select("*").eq("customer_id", params.id).eq("status", "completed").order("created_at", { ascending: false });
+  const [{ data: responsible }, { data: sales }] = await Promise.all([
+    customer.assigned_collaborator_id
+      ? supabase.from("collaborators").select("id, name, role").eq("id", customer.assigned_collaborator_id).maybeSingle()
+      : Promise.resolve({ data: null } as any),
+    supabase.from("sales").select("*").eq("customer_id", params.id).eq("status", "completed").order("created_at", { ascending: false }),
+  ]);
+
   const saleIds = (sales ?? []).map((s) => s.id);
   const [{ data: items }, { data: installments }] = saleIds.length
     ? await Promise.all([
@@ -32,15 +40,23 @@ export default async function FichaClientePage({ params }: { params: { id: strin
   (installments ?? []).forEach((item) => installmentsBySale.set(item.sale_id, [...(installmentsBySale.get(item.sale_id) ?? []), item]));
   const paymentsByInstallment = new Map<string, any[]>();
   (payments ?? []).forEach((item) => paymentsByInstallment.set(item.installment_id, [...(paymentsByInstallment.get(item.installment_id) ?? []), item]));
+  const saleMap = new Map((sales ?? []).map((sale) => [sale.id, sale]));
 
   const totalPurchased = (sales ?? []).reduce((sum, s) => sum + Number(s.total), 0);
-  const totalOpen = (installments ?? []).filter((i) => i.status !== "pago").reduce((sum, i) => sum + Number(i.amount) - Number(i.paid_amount), 0);
+  const pendingInstallments = (installments ?? []).filter((i) => i.status !== "pago" && Number(i.amount) - Number(i.paid_amount) > 0);
+  const totalOpen = pendingInstallments.reduce((sum, i) => sum + Number(i.amount) - Number(i.paid_amount), 0);
   const totalReceivedFromInstallments = (payments ?? []).reduce((sum, p) => sum + Number(p.amount), 0);
   const directPaid = (sales ?? []).reduce((sum, s) => sum + (s.is_paid ? Number(s.total) : Number(s.down_payment)), 0);
   const totalPaid = directPaid + totalReceivedFromInstallments;
 
   const whatsappNumber = customer.whatsapp ?? customer.phone;
-  const chargeText = `Olá ${customer.name}, tudo bem? Seu saldo em aberto é ${formatCurrency(totalOpen)}. Quando puder, me avise sobre o pagamento.`;
+  const chargeLines = pendingInstallments.map((inst) => {
+    const sale = saleMap.get(inst.sale_id);
+    const open = Number(inst.amount) - Number(inst.paid_amount);
+    const dueLabel = inst.status === "vencido" ? `vencida em ${formatDate(inst.due_date)}` : `vence em ${formatDate(inst.due_date)}`;
+    return `• Parcela ${inst.installment_number}/${inst.total_installments} da venda #${sale?.sale_number ?? "-"} — ${formatCurrency(open)} — ${dueLabel}`;
+  });
+  const chargeText = `Olá ${customer.name}, tudo bem?\n\nEstou entrando em contato sobre ${chargeLines.length === 1 ? "a parcela pendente" : "as parcelas pendentes"} da sua ficha #${customer.ficha_number}:\n\n${chargeLines.join("\n")}\n\nTotal pendente: ${formatCurrency(totalOpen)}. Quando puder, me confirme sobre o pagamento. Obrigado!`;
 
   return (
     <div className="space-y-4">
@@ -49,10 +65,20 @@ export default async function FichaClientePage({ params }: { params: { id: strin
       <div className="card">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-50 text-lg font-bold text-brand-600">{customer.name.charAt(0).toUpperCase()}</span>
-            <div><h1 className="text-lg font-bold text-slate-900">{customer.name}</h1>{customer.phone && <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500"><Phone size={12} /> {customer.phone}</p>}{(customer.city || customer.neighborhood) && <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500"><MapPin size={12} /> {[customer.neighborhood, customer.city].filter(Boolean).join(", ")}</p>}</div>
+            <span className="flex h-12 min-w-12 items-center justify-center rounded-xl bg-brand-50 px-2 text-sm font-bold text-brand-700">#{customer.ficha_number}</span>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-600">Ficha #{customer.ficha_number}</p>
+              <h1 className="text-lg font-bold text-slate-900">{customer.name}</h1>
+              {customer.phone && <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500"><Phone size={12} /> {customer.phone}</p>}
+              {(customer.city || customer.neighborhood) && <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500"><MapPin size={12} /> {[customer.neighborhood, customer.city].filter(Boolean).join(", ")}</p>}
+            </div>
           </div>
-          <Link href={`/clientes/${customer.id}/editar`} className="btn-secondary px-4 py-2.5 text-sm">Editar cliente</Link>
+          {access?.role !== "cobrador" && <Link href={`/clientes/${customer.id}/editar`} className="btn-secondary px-4 py-2.5 text-sm">Editar cliente</Link>}
+        </div>
+
+        <div className="mt-4 rounded-xl bg-surface-muted p-3">
+          <p className="text-xs text-slate-500">Colaborador responsável</p>
+          <p className="mt-1 flex items-center gap-1.5 text-sm font-semibold text-slate-800"><UserRound size={15} /> {responsible?.name ?? "Sem colaborador"}{responsible ? ` · ${responsible.role === "vendedor" ? "Vendedor" : "Cobrador"}` : ""}</p>
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
