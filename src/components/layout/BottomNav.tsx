@@ -5,14 +5,15 @@ import { usePathname } from "next/navigation";
 import { clsx } from "clsx";
 import { getMainNav } from "@/lib/nav-items";
 import type { AppRole } from "@/lib/access";
+import type { ViewPermission } from "@/lib/permissions";
 
-export function BottomNav({ role }: { role: AppRole }) {
+export function BottomNav({ role, viewPermissions = [] }: { role: AppRole; viewPermissions?: ViewPermission[] }) {
   const pathname = usePathname();
-  const items = getMainNav(role);
+  const items = getMainNav(role, viewPermissions);
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur pb-[env(safe-area-inset-bottom)] md:hidden" aria-label="Navegação principal">
-      <ul className="grid" style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}>
+      <ul className="grid" style={{ gridTemplateColumns: `repeat(${Math.max(items.length, 1)}, minmax(0, 1fr))` }}>
         {items.map((item) => {
           const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
           const Icon = item.icon;
