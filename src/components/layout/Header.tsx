@@ -1,10 +1,10 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { MAIN_NAV, SECONDARY_NAV } from "@/lib/nav-items";
+import { ALL_NAV } from "@/lib/nav-items";
 
 function getTitle(pathname: string): string {
-  const all = [...MAIN_NAV, ...SECONDARY_NAV].sort((a, b) => b.href.length - a.href.length);
+  const all = [...ALL_NAV].sort((a, b) => b.href.length - a.href.length);
   const match = all.find((item) => item.href === "/" ? pathname === "/" : pathname.startsWith(item.href));
   return match?.label ?? "Controle de Vendas";
 }
