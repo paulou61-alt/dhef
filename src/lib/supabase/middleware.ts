@@ -6,6 +6,11 @@ import { firstAllowedPath, normalizeViewPermissions, permissionForPath } from "@
 const PUBLIC_ROUTES = ["/login", "/recuperar-senha", "/redefinir-senha"];
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
+type CollaboratorAccess = {
+  role: "vendedor" | "cobrador";
+  is_active: boolean;
+  view_permissions: string[] | null;
+};
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -33,7 +38,7 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  let collaborator: { role: "vendedor" | "cobrador"; is_active: boolean; view_permissions: string[] | null } | null = null;
+  let collaborator: CollaboratorAccess | null = null;
 
   if (user) {
     const { data } = await supabase
@@ -41,7 +46,7 @@ export async function updateSession(request: NextRequest) {
       .select("role, is_active, view_permissions")
       .eq("auth_user_id", user.id)
       .maybeSingle();
-    collaborator = data as typeof collaborator;
+    collaborator = data as CollaboratorAccess | null;
   }
 
   if (user && pathname === "/login") {
