@@ -1,0 +1,224 @@
+"use client";
+
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
+import { createSale } from "@/app/(app)/vender/actions";
+import { formatCurrency } from "@/utils/format";
+
+type Customer = { id: string; name: string };
+type Product = { id: string; name: string; sale_price: number };
+type Variant = {
+  id: string;
+  product_id: string;
+  variant_name: string;
+  stock_quantity: number;
+  sale_price: number | null;
+};
+
+type CartItem = { variantId: string; quantity: number };
+
+export function SaleForm({
+  customers,
+  products,
+  variants,
+}: {
+  customers: Customer[];
+  products: Product[];
+  variants: Variant[];
+}) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [customerId, setCustomerId] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("pix");
+  const [downPayment, setDownPayment] = useState("");
+  const [installmentsCount, setInstallmentsCount] = useState("2");
+  const [firstDueDate, setFirstDueDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [notes, setNotes] = useState("");
+  const [selectedVariant, setSelectedVariant] = useState("");
+  const [items, setItems] = useState<CartItem[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  const productById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
+  const variantById = useMemo(() => new Map(variants.map((v) => [v.id, v])), [variants]);
+
+  const total = items.reduce((sum, item) => {
+    const variant = variantById.get(item.variantId);
+    if (!variant) return sum;
+    const product = productById.get(variant.product_id);
+    const price = Number(variant.sale_price ?? product?.sale_price ?? 0);
+    return sum + price * item.quantity;
+  }, 0);
+
+  function addItem() {
+    if (!selectedVariant) return;
+    const variant = variantById.get(selectedVariant);
+    if (!variant || variant.stock_quantity <= 0) return;
+    setItems((current) => {
+      const existing = current.find((item) => item.variantId === selectedVariant);
+      if (existing) {
+        return current.map((item) =>
+          item.variantId === selectedVariant
+            ? { ...item, quantity: Math.min(item.quantity + 1, variant.stock_quantity) }
+            : item
+        );
+      }
+      return [...current, { variantId: selectedVariant, quantity: 1 }];
+    });
+    setSelectedVariant("");
+  }
+
+  function changeQuantity(variantId: string, delta: number) {
+    const variant = variantById.get(variantId);
+    setItems((current) =>
+      current
+        .map((item) => {
+          if (item.variantId !== variantId) return item;
+          const next = Math.max(0, Math.min(item.quantity + delta, variant?.stock_quantity ?? item.quantity));
+          return { ...item, quantity: next };
+        })
+        .filter((item) => item.quantity > 0)
+    );
+  }
+
+  function submit() {
+    setError(null);
+    startTransition(async () => {
+      const result = await createSale({
+        customerId: customerId || null,
+        items: items.map((item) => ({ product_variant_id: item.variantId, quantity: item.quantity })),
+        paymentMethod: paymentMethod as any,
+        downPayment: Number(downPayment.replace(",", ".")) || 0,
+        installmentsCount: Number(installmentsCount) || 1,
+        firstDueDate,
+        notes,
+      });
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      router.push(`/vender/${result.id}`);
+      router.refresh();
+    });
+  }
+
+  const needsCustomer = paymentMethod === "fiado" || paymentMethod === "parcelado";
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
+      <div className="space-y-4">
+        <div className="card">
+          <label className="label">Cliente {needsCustomer ? "*" : "(opcional)"}</label>
+          <select className="input-field" value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
+            <option value="">Venda sem cliente</option>
+            {customers.map((customer) => (
+              <option key={customer.id} value={customer.id}>{customer.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="card space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-[15px] font-bold text-slate-900">Produtos</h2>
+            <span className="text-xs text-slate-500">{items.length} item(ns)</span>
+          </div>
+
+          <div className="flex gap-2">
+            <select className="input-field flex-1" value={selectedVariant} onChange={(e) => setSelectedVariant(e.target.value)}>
+              <option value="">Selecione um produto/variação</option>
+              {variants.filter((v) => v.stock_quantity > 0).map((variant) => {
+                const product = productById.get(variant.product_id);
+                return (
+                  <option key={variant.id} value={variant.id}>
+                    {product?.name ?? "Produto"} — {variant.variant_name} ({variant.stock_quantity} em estoque)
+                  </option>
+                );
+              })}
+            </select>
+            <button type="button" onClick={addItem} className="btn-primary px-4"><Plus size={18} /></button>
+          </div>
+
+          {items.length === 0 ? (
+            <div className="rounded-xl bg-surface-muted py-8 text-center text-sm text-slate-500">
+              <ShoppingCart className="mx-auto mb-2 text-slate-300" size={28} />
+              Adicione os produtos da venda.
+            </div>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {items.map((item) => {
+                const variant = variantById.get(item.variantId)!;
+                const product = productById.get(variant.product_id);
+                const price = Number(variant.sale_price ?? product?.sale_price ?? 0);
+                return (
+                  <li key={item.variantId} className="flex items-center gap-3 py-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-slate-800">{product?.name}</p>
+                      <p className="text-xs text-slate-500">{variant.variant_name} · {formatCurrency(price)}</p>
+                    </div>
+                    <div className="flex items-center gap-1 rounded-xl bg-surface-muted p-1">
+                      <button type="button" onClick={() => changeQuantity(item.variantId, -1)} className="p-2 text-slate-500"><Minus size={15} /></button>
+                      <span className="w-6 text-center text-sm font-bold">{item.quantity}</span>
+                      <button type="button" onClick={() => changeQuantity(item.variantId, 1)} className="p-2 text-slate-500"><Plus size={15} /></button>
+                    </div>
+                    <button type="button" onClick={() => setItems((x) => x.filter((i) => i.variantId !== item.variantId))} className="p-2 text-danger"><Trash2 size={17} /></button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <div className="card space-y-3">
+          <h2 className="text-[15px] font-bold text-slate-900">Pagamento</h2>
+          <div>
+            <label className="label">Forma de pagamento</label>
+            <select className="input-field" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
+              <option value="pix">Pix</option>
+              <option value="dinheiro">Dinheiro</option>
+              <option value="cartao">Cartão</option>
+              <option value="fiado">Fiado</option>
+              <option value="parcelado">Parcelado</option>
+            </select>
+          </div>
+
+          {(paymentMethod === "fiado" || paymentMethod === "parcelado") && (
+            <>
+              <div>
+                <label className="label">Entrada</label>
+                <input className="input-field" inputMode="decimal" value={downPayment} onChange={(e) => setDownPayment(e.target.value)} placeholder="0,00" />
+              </div>
+              {paymentMethod === "parcelado" && (
+                <div>
+                  <label className="label">Quantidade de parcelas</label>
+                  <input className="input-field" type="number" min="1" max="36" value={installmentsCount} onChange={(e) => setInstallmentsCount(e.target.value)} />
+                </div>
+              )}
+              <div>
+                <label className="label">Primeiro vencimento</label>
+                <input className="input-field" type="date" value={firstDueDate} onChange={(e) => setFirstDueDate(e.target.value)} />
+              </div>
+            </>
+          )}
+
+          <div>
+            <label className="label">Observações</label>
+            <textarea className="input-field min-h-24" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Opcional" />
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-slate-500">Total da venda</span>
+            <span className="text-2xl font-bold text-slate-900">{formatCurrency(total)}</span>
+          </div>
+          {error && <p className="mt-3 rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
+          <button type="button" onClick={submit} disabled={isPending || items.length === 0 || (needsCustomer && !customerId)} className="btn-primary mt-4 w-full">
+            {isPending ? "Finalizando..." : "Concluir venda"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
