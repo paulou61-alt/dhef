@@ -4,13 +4,13 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "@/lib/supabase/config";
 import { getAccessContext } from "@/lib/access";
+import { normalizeViewPermissions, type ViewPermission } from "@/lib/permissions";
 
 export interface CreateCollaboratorInput {
   name: string;
-  username: string;
-  password: string;
   phone?: string;
   role: "vendedor" | "cobrador";
+  viewPermissions: ViewPermission[];
 }
 
 export interface CollaboratorValeInput {
@@ -53,28 +53,68 @@ export async function createCollaborator(
   }
 
   const name = input.name.trim();
-  const username = input.username.trim().toLowerCase();
-  const password = input.password;
-
   if (!name) return { error: "Informe o nome do colaborador." };
-  if (!/^[a-z0-9._-]{3,30}$/.test(username)) {
-    return { error: "O usuário deve ter de 3 a 30 caracteres e usar apenas letras, números, ponto, hífen ou underline." };
-  }
-  if (password.length < 8) return { error: "A senha deve ter pelo menos 8 caracteres." };
 
-  const result = await callCollaboratorManager({
-    action: "create",
+  const permissions = normalizeViewPermissions(input.role, input.viewPermissions);
+  if (permissions.length === 0) {
+    return { error: "Selecione pelo menos uma área que o colaborador pode visualizar." };
+  }
+
+  const supabase = createClient();
+  const { error } = await supabase.from("collaborators").insert({
+    owner_id: access.ownerId,
     name,
-    username,
-    password,
     phone: input.phone?.trim() || null,
     role: input.role,
+    is_active: true,
+    view_permissions: permissions,
+    username: null,
+    email: null,
+    auth_user_id: null,
+    accepted_at: null,
   });
 
-  if (!result.ok) return { error: result.error || "Não foi possível cadastrar o colaborador." };
+  if (error) return { error: "Não foi possível cadastrar o colaborador." };
 
   revalidatePath("/colaboradores");
   revalidatePath("/fichas");
+  return { success: true };
+}
+
+export async function updateCollaboratorPermissions(
+  collaboratorId: string,
+  requestedPermissions: ViewPermission[]
+): Promise<{ error?: string; success?: boolean }> {
+  const access = await getAccessContext();
+  if (!access || access.role !== "owner") {
+    return { error: "Apenas o proprietário pode alterar permissões." };
+  }
+
+  const supabase = createClient();
+  const { data: collaborator } = await supabase
+    .from("collaborators")
+    .select("role")
+    .eq("id", collaboratorId)
+    .eq("owner_id", access.ownerId)
+    .maybeSingle();
+
+  if (!collaborator) return { error: "Colaborador não encontrado." };
+
+  const role = collaborator.role as "vendedor" | "cobrador";
+  const permissions = normalizeViewPermissions(role, requestedPermissions);
+  if (permissions.length === 0) {
+    return { error: "O colaborador precisa ter pelo menos uma visualização liberada." };
+  }
+
+  const { error } = await supabase
+    .from("collaborators")
+    .update({ view_permissions: permissions })
+    .eq("id", collaboratorId)
+    .eq("owner_id", access.ownerId);
+
+  if (error) return { error: "Não foi possível salvar as permissões." };
+
+  revalidatePath("/colaboradores");
   return { success: true };
 }
 
@@ -88,11 +128,7 @@ export async function removeCollaborator(
 
   if (!collaboratorId) return { error: "Colaborador inválido." };
 
-  const result = await callCollaboratorManager({
-    action: "remove",
-    collaboratorId,
-  });
-
+  const result = await callCollaboratorManager({ action: "remove", collaboratorId });
   if (!result.ok) return { error: result.error || "Não foi possível remover o colaborador." };
 
   revalidatePath("/colaboradores");
@@ -105,9 +141,7 @@ export async function addCollaboratorValeMovement(
   input: CollaboratorValeInput
 ): Promise<{ error?: string; success?: boolean }> {
   const access = await getAccessContext();
-  if (!access || access.role !== "owner") {
-    return { error: "Apenas o proprietário pode movimentar vales." };
-  }
+  if (!access || access.role !== "owner") return { error: "Apenas o proprietário pode movimentar vales." };
 
   const collaboratorId = input.collaboratorId?.trim();
   const amount = Number(input.amount);
@@ -115,12 +149,8 @@ export async function addCollaboratorValeMovement(
   const notes = input.notes?.trim().slice(0, 240) || null;
 
   if (!collaboratorId) return { error: "Colaborador inválido." };
-  if (movementType !== "vale" && movementType !== "abatimento") {
-    return { error: "Tipo de movimentação inválido." };
-  }
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return { error: "Informe um valor maior que zero." };
-  }
+  if (movementType !== "vale" && movementType !== "abatimento") return { error: "Tipo de movimentação inválido." };
+  if (!Number.isFinite(amount) || amount <= 0) return { error: "Informe um valor maior que zero." };
 
   const supabase = createClient();
   const { error } = await supabase.from("collaborator_vale_movements").insert({
@@ -133,9 +163,7 @@ export async function addCollaboratorValeMovement(
   });
 
   if (error) {
-    if (error.message.toLowerCase().includes("abatimento não pode")) {
-      return { error: "O abatimento não pode ser maior que o saldo em vale." };
-    }
+    if (error.message.toLowerCase().includes("abatimento não pode")) return { error: "O abatimento não pode ser maior que o saldo em vale." };
     return { error: "Não foi possível registrar a movimentação do vale." };
   }
 
