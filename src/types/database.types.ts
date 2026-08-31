@@ -3,6 +3,7 @@ export type SalePaymentMethod = "pix" | "dinheiro" | "cartao" | "fiado" | "parce
 export type InstallmentStatus = "pendente" | "pago" | "vencido" | "parcial";
 export type MovementType = "entrada" | "saida" | "ajuste" | "venda" | "devolucao";
 export type CollaboratorRole = "vendedor" | "cobrador";
+export type CollaboratorViewPermission = "inicio" | "vender" | "clientes" | "fichas" | "cobrancas";
 
 export interface Profile {
   id: string;
@@ -18,12 +19,13 @@ export interface Collaborator {
   owner_id: string;
   auth_user_id: string | null;
   name: string;
-  username: string;
-  email: string;
+  username: string | null;
+  email: string | null;
   phone: string | null;
   role: CollaboratorRole;
   is_active: boolean;
   accepted_at: string | null;
+  view_permissions: CollaboratorViewPermission[];
   created_at: string;
   updated_at: string;
 }
