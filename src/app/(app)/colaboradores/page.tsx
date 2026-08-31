@@ -26,7 +26,7 @@ export default async function ColaboradoresPage() {
     <div className="space-y-4">
       <div>
         <h1 className="text-xl font-bold text-slate-900">Colaboradores</h1>
-        <p className="mt-1 text-sm text-slate-500">Cadastre vendedores e cobradores usando apenas usuário e senha.</p>
+        <p className="mt-1 text-sm text-slate-500">Gerencie vendedores e cobradores com acesso individual ao sistema.</p>
       </div>
 
       <CollaboratorForm />
