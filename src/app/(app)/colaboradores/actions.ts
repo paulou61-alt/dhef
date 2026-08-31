@@ -13,6 +13,29 @@ export interface CreateCollaboratorInput {
   role: "vendedor" | "cobrador";
 }
 
+async function callCollaboratorManager(payload: Record<string, unknown>) {
+  const supabase = createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) return { ok: false, error: "Sessão expirada. Faça login novamente." };
+
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/manage-collaborator`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      apikey: SUPABASE_PUBLISHABLE_KEY,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+    cache: "no-store",
+  });
+
+  const result = await response.json().catch(() => ({}));
+  return {
+    ok: response.ok,
+    error: response.ok ? undefined : result?.error || "Não foi possível concluir a operação.",
+  };
+}
+
 export async function createCollaborator(
   input: CreateCollaboratorInput
 ): Promise<{ error?: string; success?: boolean }> {
@@ -31,31 +54,41 @@ export async function createCollaborator(
   }
   if (password.length < 8) return { error: "A senha deve ter pelo menos 8 caracteres." };
 
-  const supabase = createClient();
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.access_token) return { error: "Sessão expirada. Faça login novamente." };
-
-  const response = await fetch(`${SUPABASE_URL}/functions/v1/manage-collaborator`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-      apikey: SUPABASE_PUBLISHABLE_KEY,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      name,
-      username,
-      password,
-      phone: input.phone?.trim() || null,
-      role: input.role,
-    }),
-    cache: "no-store",
+  const result = await callCollaboratorManager({
+    action: "create",
+    name,
+    username,
+    password,
+    phone: input.phone?.trim() || null,
+    role: input.role,
   });
 
-  const result = await response.json().catch(() => ({}));
-  if (!response.ok) return { error: result?.error || "Não foi possível cadastrar o colaborador." };
+  if (!result.ok) return { error: result.error || "Não foi possível cadastrar o colaborador." };
 
   revalidatePath("/colaboradores");
   revalidatePath("/fichas");
+  return { success: true };
+}
+
+export async function removeCollaborator(
+  collaboratorId: string
+): Promise<{ error?: string; success?: boolean }> {
+  const access = await getAccessContext();
+  if (!access || access.role !== "owner") {
+    return { error: "Apenas o proprietário pode remover colaboradores." };
+  }
+
+  if (!collaboratorId) return { error: "Colaborador inválido." };
+
+  const result = await callCollaboratorManager({
+    action: "remove",
+    collaboratorId,
+  });
+
+  if (!result.ok) return { error: result.error || "Não foi possível remover o colaborador." };
+
+  revalidatePath("/colaboradores");
+  revalidatePath("/fichas");
+  revalidatePath("/clientes");
   return { success: true };
 }
