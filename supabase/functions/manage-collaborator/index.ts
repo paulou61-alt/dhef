@@ -21,16 +21,79 @@ Deno.serve(async (req: Request) => {
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!supabaseUrl || !serviceRoleKey) return json({ error: "Configuração do servidor indisponível." }, 500);
 
-  const admin = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  const admin = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
   const { data: authData, error: authError } = await admin.auth.getUser(token);
   const owner = authData.user;
   if (authError || !owner) return json({ error: "Sessão inválida." }, 401);
 
-  const { data: callerCollaborator } = await admin.from("collaborators").select("id").eq("auth_user_id", owner.id).maybeSingle();
-  if (callerCollaborator) return json({ error: "Apenas o proprietário pode cadastrar colaboradores." }, 403);
+  const { data: callerCollaborator } = await admin
+    .from("collaborators")
+    .select("id")
+    .eq("auth_user_id", owner.id)
+    .maybeSingle();
+
+  if (callerCollaborator) {
+    return json({ error: "Apenas o proprietário pode gerenciar colaboradores." }, 403);
+  }
 
   let body: any;
-  try { body = await req.json(); } catch { return json({ error: "Dados inválidos." }, 400); }
+  try {
+    body = await req.json();
+  } catch {
+    return json({ error: "Dados inválidos." }, 400);
+  }
+
+  const action = body?.action === "remove" ? "remove" : "create";
+
+  if (action === "remove") {
+    const collaboratorId = String(body?.collaboratorId ?? "").trim();
+    if (!collaboratorId) return json({ error: "Colaborador inválido." }, 400);
+
+    const { data: collaborator, error: collaboratorError } = await admin
+      .from("collaborators")
+      .select("id, auth_user_id, name")
+      .eq("id", collaboratorId)
+      .eq("owner_id", owner.id)
+      .maybeSingle();
+
+    if (collaboratorError) return json({ error: "Não foi possível localizar o colaborador." }, 400);
+    if (!collaborator) return json({ error: "Colaborador não encontrado." }, 404);
+
+    const authUserId = collaborator.auth_user_id as string | null;
+    if (authUserId) {
+      const { error: deleteAuthError } = await admin.auth.admin.deleteUser(authUserId);
+      if (deleteAuthError && !deleteAuthError.message.toLowerCase().includes("not found")) {
+        return json({ error: "Não foi possível remover o acesso do colaborador." }, 400);
+      }
+    }
+
+    const { error: customersError } = await admin
+      .from("customers")
+      .update({ assigned_collaborator_id: null })
+      .eq("user_id", owner.id)
+      .eq("assigned_collaborator_id", collaborator.id);
+
+    if (customersError) {
+      return json({ error: "O acesso foi removido, mas não foi possível liberar os clientes vinculados." }, 400);
+    }
+
+    const { error: removeError } = await admin
+      .from("collaborators")
+      .update({
+        is_active: false,
+        auth_user_id: null,
+        accepted_at: null,
+      })
+      .eq("id", collaborator.id)
+      .eq("owner_id", owner.id);
+
+    if (removeError) return json({ error: "Não foi possível remover o colaborador." }, 400);
+
+    return json({ ok: true, removed: { id: collaborator.id, name: collaborator.name } });
+  }
 
   const name = String(body?.name ?? "").trim();
   const username = String(body?.username ?? "").trim().toLowerCase();
@@ -39,11 +102,18 @@ Deno.serve(async (req: Request) => {
   const role = body?.role === "cobrador" ? "cobrador" : body?.role === "vendedor" ? "vendedor" : null;
 
   if (!name) return json({ error: "Informe o nome do colaborador." }, 400);
-  if (!/^[a-z0-9._-]{3,30}$/.test(username)) return json({ error: "O usuário deve ter de 3 a 30 caracteres e usar apenas letras, números, ponto, hífen ou underline." }, 400);
+  if (!/^[a-z0-9._-]{3,30}$/.test(username)) {
+    return json({ error: "O usuário deve ter de 3 a 30 caracteres e usar apenas letras, números, ponto, hífen ou underline." }, 400);
+  }
   if (password.length < 8) return json({ error: "A senha deve ter pelo menos 8 caracteres." }, 400);
   if (!role) return json({ error: "Função inválida." }, 400);
 
-  const { data: existing } = await admin.from("collaborators").select("id, owner_id, auth_user_id").eq("username", username).maybeSingle();
+  const { data: existing } = await admin
+    .from("collaborators")
+    .select("id, owner_id, auth_user_id")
+    .eq("username", username)
+    .maybeSingle();
+
   if (existing?.auth_user_id) return json({ error: "Este usuário já está em uso." }, 409);
   if (existing && existing.owner_id !== owner.id) return json({ error: "Este usuário já está em uso." }, 409);
 
@@ -57,7 +127,9 @@ Deno.serve(async (req: Request) => {
 
   if (createError || !created.user) {
     const message = createError?.message?.toLowerCase() ?? "";
-    if (message.includes("already") || message.includes("registered")) return json({ error: "Este usuário já está em uso." }, 409);
+    if (message.includes("already") || message.includes("registered")) {
+      return json({ error: "Este usuário já está em uso." }, 409);
+    }
     return json({ error: "Não foi possível criar o acesso do colaborador." }, 400);
   }
 
