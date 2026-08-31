@@ -20,8 +20,19 @@ function buildCustomerPayload(formData: FormData) {
   const name = getStringField(formData, "name");
   if (!name) throw new Error("O nome do cliente é obrigatório.");
 
+  const fichaNumberRaw = getStringField(formData, "ficha_number");
+  if (!fichaNumberRaw || !/^\d+$/.test(fichaNumberRaw)) {
+    throw new Error("Informe um número de ficha válido.");
+  }
+
+  const fichaNumber = Number(fichaNumberRaw);
+  if (!Number.isSafeInteger(fichaNumber) || fichaNumber <= 0) {
+    throw new Error("O número da ficha deve ser maior que zero.");
+  }
+
   const creditLimitRaw = getStringField(formData, "credit_limit");
   return {
+    ficha_number: fichaNumber,
     name,
     phone: getStringField(formData, "phone"),
     whatsapp: getStringField(formData, "whatsapp"),
@@ -35,6 +46,19 @@ function buildCustomerPayload(formData: FormData) {
     credit_limit: creditLimitRaw ? parseFloat(creditLimitRaw.replace(/\./g, "").replace(",", ".")) : null,
     notes: getStringField(formData, "notes"),
   };
+}
+
+function customerWriteError(error: any, fallback: string) {
+  if (error?.code === "23505") {
+    return "Já existe uma ficha com esse número. Escolha outro número.";
+  }
+
+  const message = String(error?.message ?? "").toLowerCase();
+  if (message.includes("número da ficha é obrigatório")) return "Informe o número da ficha.";
+  if (message.includes("número da ficha deve ser maior")) return "O número da ficha deve ser maior que zero.";
+  if (message.includes("numeração da ficha não pode ser alterada")) return "O número da ficha não pode ser alterado depois do cadastro.";
+  if (message.includes("colaborador responsável inválido")) return "Revise o colaborador responsável.";
+  return fallback;
 }
 
 export async function createCustomer(formData: FormData): Promise<CustomerFormState> {
@@ -54,7 +78,7 @@ export async function createCustomer(formData: FormData): Promise<CustomerFormSt
     .select("id")
     .single();
 
-  if (error) return { error: "Não foi possível salvar o cliente. Revise o colaborador responsável e tente novamente." };
+  if (error) return { error: customerWriteError(error, "Não foi possível salvar o cliente. Tente novamente.") };
 
   revalidatePath("/clientes");
   revalidatePath("/fichas");
@@ -78,7 +102,7 @@ export async function updateCustomer(customerId: string, formData: FormData): Pr
     .eq("id", customerId)
     .eq("user_id", access.ownerId);
 
-  if (error) return { error: "Não foi possível atualizar o cliente. Tente novamente." };
+  if (error) return { error: customerWriteError(error, "Não foi possível atualizar o cliente. Tente novamente.") };
 
   revalidatePath("/clientes");
   revalidatePath(`/clientes/${customerId}`);
