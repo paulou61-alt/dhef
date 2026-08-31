@@ -43,7 +43,6 @@ const SELLER_MAIN: NavItem[] = [
   { href: "/vender", label: "Vender", icon: ShoppingCart },
   { href: "/clientes", label: "Clientes", icon: Users },
   { href: "/fichas", label: "Fichas", icon: ClipboardList },
-  { href: "/estoque", label: "Estoque", icon: Package },
 ];
 
 const COLLECTOR_MAIN: NavItem[] = [
