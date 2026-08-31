@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { ALL_VIEW_PERMISSIONS, normalizeViewPermissions, type ViewPermission } from "@/lib/permissions";
 
 export type AppRole = "owner" | "vendedor" | "cobrador";
 
@@ -8,6 +9,7 @@ export interface AccessContext {
   role: AppRole;
   collaboratorId: string | null;
   name: string | null;
+  viewPermissions: ViewPermission[];
 }
 
 export async function getAccessContext(): Promise<AccessContext | null> {
@@ -17,18 +19,20 @@ export async function getAccessContext(): Promise<AccessContext | null> {
 
   const { data: collaborator } = await supabase
     .from("collaborators")
-    .select("id, owner_id, name, role, is_active")
+    .select("id, owner_id, name, role, is_active, view_permissions")
     .eq("auth_user_id", user.id)
     .maybeSingle();
 
   if (collaborator) {
     if (!collaborator.is_active) return null;
+    const role = collaborator.role as "vendedor" | "cobrador";
     return {
       userId: user.id,
       ownerId: collaborator.owner_id,
-      role: collaborator.role as AppRole,
+      role,
       collaboratorId: collaborator.id,
       name: collaborator.name,
+      viewPermissions: normalizeViewPermissions(role, collaborator.view_permissions as string[] | null),
     };
   }
 
@@ -44,5 +48,6 @@ export async function getAccessContext(): Promise<AccessContext | null> {
     role: "owner",
     collaboratorId: null,
     name: profile?.full_name ?? user.email ?? null,
+    viewPermissions: ALL_VIEW_PERMISSIONS,
   };
 }
