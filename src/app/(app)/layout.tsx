@@ -10,12 +10,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-dvh">
-      <Sidebar role={access.role} displayName={access.name} />
+      <Sidebar role={access.role} displayName={access.name} viewPermissions={access.viewPermissions} />
       <div className="md:pl-64">
         <Header />
         <main className="mx-auto max-w-5xl px-4 pb-24 pt-4 md:px-8 md:pb-10 md:pt-6">{children}</main>
       </div>
-      <BottomNav role={access.role} />
+      <BottomNav role={access.role} viewPermissions={access.viewPermissions} />
     </div>
   );
 }
