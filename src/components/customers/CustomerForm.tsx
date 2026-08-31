@@ -53,9 +53,31 @@ export function CustomerForm({
       <section className="card space-y-4">
         <h2 className="text-[14px] font-bold text-slate-900">Dados básicos</h2>
 
-        <div>
-          <label className="label" htmlFor="name">Nome *</label>
-          <input id="name" name="name" required className="input-field" placeholder="Nome completo" defaultValue={customer?.name} />
+        <div className="grid gap-3 sm:grid-cols-[150px_minmax(0,1fr)]">
+          <div>
+            <label className="label" htmlFor="ficha_number">Número da ficha *</label>
+            <input
+              id="ficha_number"
+              name="ficha_number"
+              type="number"
+              min="1"
+              step="1"
+              inputMode="numeric"
+              required
+              readOnly={Boolean(customer)}
+              className={`input-field font-semibold ${customer ? "cursor-not-allowed bg-slate-50 text-slate-500" : ""}`}
+              placeholder="Ex.: 25"
+              defaultValue={customer?.ficha_number ?? ""}
+            />
+            <p className="mt-1 text-[11px] text-slate-400">
+              {customer ? "O número fica travado após o cadastro." : "Você escolhe o número. Não pode repetir uma ficha já existente."}
+            </p>
+          </div>
+
+          <div>
+            <label className="label" htmlFor="name">Nome *</label>
+            <input id="name" name="name" required className="input-field" placeholder="Nome completo" defaultValue={customer?.name} />
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
