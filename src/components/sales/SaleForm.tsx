@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
 import { createSale } from "@/app/(app)/vender/actions";
+import { SelectField, type SelectOption } from "@/components/ui/SelectField";
 import { formatCurrency } from "@/utils/format";
 
 type Customer = { id: string; name: string };
@@ -17,6 +18,14 @@ type Variant = {
 };
 
 type CartItem = { variantId: string; quantity: number };
+
+const PAYMENT_OPTIONS: SelectOption[] = [
+  { value: "pix", label: "Pix", description: "Pagamento imediato" },
+  { value: "dinheiro", label: "Dinheiro", description: "Pagamento em espécie" },
+  { value: "cartao", label: "Cartão", description: "Crédito ou débito" },
+  { value: "fiado", label: "Fiado", description: "Valor fica em aberto" },
+  { value: "parcelado", label: "Parcelado", description: "Pagamento em parcelas" },
+];
 
 export function SaleForm({
   customers,
@@ -41,6 +50,34 @@ export function SaleForm({
 
   const productById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
   const variantById = useMemo(() => new Map(variants.map((v) => [v.id, v])), [variants]);
+
+  const customerOptions = useMemo<SelectOption[]>(
+    () => [
+      { value: "", label: "Venda sem cliente", description: "Venda avulsa, sem vínculo com ficha" },
+      ...customers.map((customer) => ({
+        value: customer.id,
+        label: customer.name,
+        description: "Cliente cadastrado",
+      })),
+    ],
+    [customers]
+  );
+
+  const variantOptions = useMemo<SelectOption[]>(
+    () =>
+      variants
+        .filter((variant) => variant.stock_quantity > 0)
+        .map((variant) => {
+          const product = productById.get(variant.product_id);
+          const price = Number(variant.sale_price ?? product?.sale_price ?? 0);
+          return {
+            value: variant.id,
+            label: `${product?.name ?? "Produto"} — ${variant.variant_name}`,
+            description: `${variant.stock_quantity} em estoque · ${formatCurrency(price)}`,
+          };
+        }),
+    [variants, productById]
+  );
 
   const total = items.reduce((sum, item) => {
     const variant = variantById.get(item.variantId);
@@ -109,12 +146,13 @@ export function SaleForm({
       <div className="space-y-4">
         <div className="card">
           <label className="label">Cliente {needsCustomer ? "*" : "(opcional)"}</label>
-          <select className="input-field" value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
-            <option value="">Venda sem cliente</option>
-            {customers.map((customer) => (
-              <option key={customer.id} value={customer.id}>{customer.name}</option>
-            ))}
-          </select>
+          <SelectField
+            value={customerId}
+            onChange={setCustomerId}
+            options={customerOptions}
+            searchable={customers.length > 6}
+            searchPlaceholder="Buscar cliente..."
+          />
         </div>
 
         <div className="card space-y-3">
@@ -123,19 +161,25 @@ export function SaleForm({
             <span className="text-xs text-slate-500">{items.length} item(ns)</span>
           </div>
 
-          <div className="flex gap-2">
-            <select className="input-field flex-1" value={selectedVariant} onChange={(e) => setSelectedVariant(e.target.value)}>
-              <option value="">Selecione um produto/variação</option>
-              {variants.filter((v) => v.stock_quantity > 0).map((variant) => {
-                const product = productById.get(variant.product_id);
-                return (
-                  <option key={variant.id} value={variant.id}>
-                    {product?.name ?? "Produto"} — {variant.variant_name} ({variant.stock_quantity} em estoque)
-                  </option>
-                );
-              })}
-            </select>
-            <button type="button" onClick={addItem} className="btn-primary px-4"><Plus size={18} /></button>
+          <div className="flex items-start gap-2">
+            <SelectField
+              className="min-w-0 flex-1"
+              value={selectedVariant}
+              onChange={setSelectedVariant}
+              options={variantOptions}
+              placeholder="Selecione um produto/variação"
+              searchable
+              searchPlaceholder="Buscar produto ou variação..."
+            />
+            <button
+              type="button"
+              onClick={addItem}
+              disabled={!selectedVariant}
+              className="btn-primary flex h-12 w-12 flex-none items-center justify-center px-0 disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label="Adicionar produto"
+            >
+              <Plus size={19} />
+            </button>
           </div>
 
           {items.length === 0 ? (
@@ -174,13 +218,7 @@ export function SaleForm({
           <h2 className="text-[15px] font-bold text-slate-900">Pagamento</h2>
           <div>
             <label className="label">Forma de pagamento</label>
-            <select className="input-field" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
-              <option value="pix">Pix</option>
-              <option value="dinheiro">Dinheiro</option>
-              <option value="cartao">Cartão</option>
-              <option value="fiado">Fiado</option>
-              <option value="parcelado">Parcelado</option>
-            </select>
+            <SelectField value={paymentMethod} onChange={setPaymentMethod} options={PAYMENT_OPTIONS} />
           </div>
 
           {(paymentMethod === "fiado" || paymentMethod === "parcelado") && (
