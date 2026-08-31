@@ -3,7 +3,8 @@ import { UserRoundCog } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getAccessContext } from "@/lib/access";
 import { CollaboratorForm } from "@/components/collaborators/CollaboratorForm";
-import { CollaboratorCard } from "@/components/collaborators/CollaboratorCard";
+import { CollaboratorProfileCard } from "@/components/collaborators/CollaboratorProfileCard";
+import { normalizeViewPermissions } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -20,13 +21,13 @@ type ValeMovement = {
 export default async function ColaboradoresPage() {
   const access = await getAccessContext();
   if (!access) redirect("/login");
-  if (access.role !== "owner") redirect(access.role === "cobrador" ? "/cobrancas" : "/vender");
+  if (access.role !== "owner") redirect("/login");
 
   const supabase = createClient();
   const [collaboratorsResult, salesResult, paymentsResult, valesResult] = await Promise.all([
     supabase
       .from("collaborators")
-      .select("id, name, username, phone, role, is_active, auth_user_id, accepted_at")
+      .select("id, name, phone, role, is_active, auth_user_id, accepted_at, view_permissions")
       .eq("owner_id", access.ownerId)
       .eq("is_active", true)
       .order("name"),
@@ -63,10 +64,7 @@ export default async function ColaboradoresPage() {
   const collectionTotals = new Map<string, number>();
   for (const payment of payments) {
     if (!payment.collected_by_collaborator_id) continue;
-    collectionTotals.set(
-      payment.collected_by_collaborator_id,
-      (collectionTotals.get(payment.collected_by_collaborator_id) ?? 0) + Number(payment.amount ?? 0)
-    );
+    collectionTotals.set(payment.collected_by_collaborator_id, (collectionTotals.get(payment.collected_by_collaborator_id) ?? 0) + Number(payment.amount ?? 0));
   }
 
   const valesByCollaborator = new Map<string, ValeMovement[]>();
@@ -75,21 +73,15 @@ export default async function ColaboradoresPage() {
     const list = valesByCollaborator.get(movement.collaborator_id) ?? [];
     list.push(movement);
     valesByCollaborator.set(movement.collaborator_id, list);
-
-    const signedAmount = movement.movement_type === "vale"
-      ? Number(movement.amount ?? 0)
-      : -Number(movement.amount ?? 0);
-    valeBalances.set(
-      movement.collaborator_id,
-      (valeBalances.get(movement.collaborator_id) ?? 0) + signedAmount
-    );
+    const signedAmount = movement.movement_type === "vale" ? Number(movement.amount ?? 0) : -Number(movement.amount ?? 0);
+    valeBalances.set(movement.collaborator_id, (valeBalances.get(movement.collaborator_id) ?? 0) + signedAmount);
   }
 
   return (
     <div className="space-y-4">
       <div>
         <h1 className="text-xl font-bold text-slate-900">Colaboradores</h1>
-        <p className="mt-1 text-sm text-slate-500">Gerencie a equipe, acompanhe vendas e controle os vales de cada colaborador.</p>
+        <p className="mt-1 text-sm text-slate-500">Gerencie a equipe, as visualizações, vendas e vales de cada colaborador.</p>
       </div>
 
       <CollaboratorForm />
@@ -97,7 +89,7 @@ export default async function ColaboradoresPage() {
       <div className="card !p-0">
         <div className="border-b border-slate-100 px-4 py-3">
           <h2 className="text-sm font-bold text-slate-900">Equipe cadastrada</h2>
-          <p className="mt-0.5 text-xs text-slate-500">Clique em um colaborador para abrir o perfil financeiro.</p>
+          <p className="mt-0.5 text-xs text-slate-500">Clique em um colaborador para abrir o perfil financeiro e alterar o que ele pode ver.</p>
         </div>
 
         {collaborators.length === 0 ? (
@@ -108,18 +100,14 @@ export default async function ColaboradoresPage() {
         ) : (
           <div className="divide-y divide-slate-100">
             {collaborators.map((collaborator) => {
+              const role = collaborator.role as "vendedor" | "cobrador";
               const salesMetric = salesTotals.get(collaborator.id) ?? { total: 0, count: 0 };
               return (
-                <CollaboratorCard
+                <CollaboratorProfileCard
                   key={collaborator.id}
-                  collaborator={{
-                    id: collaborator.id,
-                    name: collaborator.name,
-                    username: collaborator.username,
-                    phone: collaborator.phone,
-                    role: collaborator.role as "vendedor" | "cobrador",
-                  }}
+                  collaborator={{ id: collaborator.id, name: collaborator.name, phone: collaborator.phone, role }}
                   hasAccess={Boolean(collaborator.auth_user_id && collaborator.accepted_at && collaborator.is_active)}
+                  viewPermissions={normalizeViewPermissions(role, collaborator.view_permissions as string[] | null)}
                   salesTotal={salesMetric.total}
                   salesCount={salesMetric.count}
                   collectionsTotal={collectionTotals.get(collaborator.id) ?? 0}
