@@ -13,11 +13,13 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { AppRole } from "@/lib/access";
+import type { ViewPermission } from "@/lib/permissions";
 
 export interface NavItem {
   href: string;
   label: string;
   icon: LucideIcon;
+  permission?: ViewPermission;
 }
 
 const OWNER_MAIN: NavItem[] = [
@@ -39,25 +41,25 @@ const OWNER_SECONDARY: NavItem[] = [
 ];
 
 const SELLER_MAIN: NavItem[] = [
-  { href: "/", label: "Início", icon: Home },
-  { href: "/vender", label: "Vender", icon: ShoppingCart },
-  { href: "/clientes", label: "Clientes", icon: Users },
-  { href: "/fichas", label: "Fichas", icon: ClipboardList },
+  { href: "/", label: "Início", icon: Home, permission: "inicio" },
+  { href: "/vender", label: "Vender", icon: ShoppingCart, permission: "vender" },
+  { href: "/clientes", label: "Clientes", icon: Users, permission: "clientes" },
+  { href: "/fichas", label: "Fichas", icon: ClipboardList, permission: "fichas" },
 ];
 
 const COLLECTOR_MAIN: NavItem[] = [
-  { href: "/cobrancas", label: "Cobranças", icon: BadgeDollarSign },
-  { href: "/clientes", label: "Clientes", icon: Users },
-  { href: "/fichas", label: "Fichas", icon: ClipboardList },
+  { href: "/cobrancas", label: "Cobranças", icon: BadgeDollarSign, permission: "cobrancas" },
+  { href: "/clientes", label: "Clientes", icon: Users, permission: "clientes" },
+  { href: "/fichas", label: "Fichas", icon: ClipboardList, permission: "fichas" },
 ];
 
 export const MAIN_NAV = OWNER_MAIN;
 export const SECONDARY_NAV = OWNER_SECONDARY;
 export const ALL_NAV: NavItem[] = [...OWNER_MAIN, ...OWNER_SECONDARY];
 
-export function getMainNav(role: AppRole): NavItem[] {
-  if (role === "vendedor") return SELLER_MAIN;
-  if (role === "cobrador") return COLLECTOR_MAIN;
+export function getMainNav(role: AppRole, permissions: ViewPermission[] = []): NavItem[] {
+  if (role === "vendedor") return SELLER_MAIN.filter((item) => !item.permission || permissions.includes(item.permission));
+  if (role === "cobrador") return COLLECTOR_MAIN.filter((item) => !item.permission || permissions.includes(item.permission));
   return OWNER_MAIN;
 }
 
