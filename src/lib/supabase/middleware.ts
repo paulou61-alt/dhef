@@ -2,7 +2,7 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "@/lib/supabase/config";
 
-const PUBLIC_ROUTES = ["/login", "/recuperar-senha", "/redefinir-senha", "/convite"];
+const PUBLIC_ROUTES = ["/login", "/recuperar-senha", "/redefinir-senha"];
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
