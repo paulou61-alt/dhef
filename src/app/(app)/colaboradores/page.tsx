@@ -3,6 +3,7 @@ import { ShieldCheck, UserRoundCog, AlertCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getAccessContext } from "@/lib/access";
 import { CollaboratorForm } from "@/components/collaborators/CollaboratorForm";
+import { RemoveCollaboratorButton } from "@/components/collaborators/RemoveCollaboratorButton";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,7 @@ export default async function ColaboradoresPage() {
     .from("collaborators")
     .select("id, name, username, phone, role, is_active, auth_user_id, accepted_at")
     .eq("owner_id", access.ownerId)
+    .eq("is_active", true)
     .order("name");
 
   return (
@@ -51,15 +53,18 @@ export default async function ColaboradoresPage() {
                     <p className="truncate text-sm font-semibold text-slate-800">{c.name}</p>
                     <p className="truncate text-xs text-slate-500">@{c.username}{c.phone ? ` · ${c.phone}` : ""}</p>
                   </div>
-                  <div className="text-right">
-                    <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
-                      {ROLE_LABELS[c.role as keyof typeof ROLE_LABELS]}
-                    </span>
-                    <p className={`mt-1 text-[11px] font-semibold ${hasAccess ? "text-success" : "text-warning"}`}>
-                      {hasAccess ? "Acesso ativo" : c.is_active ? "Defina uma senha novamente" : "Acesso desativado"}
-                    </p>
+                  <div className="ml-auto flex flex-wrap items-center justify-end gap-3">
+                    <div className="text-right">
+                      <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                        {ROLE_LABELS[c.role as keyof typeof ROLE_LABELS]}
+                      </span>
+                      <p className={`mt-1 text-[11px] font-semibold ${hasAccess ? "text-success" : "text-warning"}`}>
+                        {hasAccess ? "Acesso ativo" : "Defina uma senha novamente"}
+                      </p>
+                    </div>
+                    {hasAccess ? <ShieldCheck size={18} className="text-success" /> : <AlertCircle size={18} className="text-warning" />}
+                    <RemoveCollaboratorButton collaboratorId={c.id} collaboratorName={c.name} />
                   </div>
-                  {hasAccess ? <ShieldCheck size={18} className="text-success" /> : <AlertCircle size={18} className="text-warning" />}
                 </div>
               );
             })}
