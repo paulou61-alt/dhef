@@ -10,6 +10,10 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: corsHeaders });
 }
 
+function validUsername(username: string) {
+  return /^[a-z0-9._-]{3,30}$/.test(username);
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Método não permitido." }, 405);
@@ -46,7 +50,8 @@ Deno.serve(async (req: Request) => {
     return json({ error: "Dados inválidos." }, 400);
   }
 
-  const action = body?.action === "remove" ? "remove" : "create";
+  const requestedAction = String(body?.action ?? "create");
+  const action = requestedAction === "remove" || requestedAction === "create_access" ? requestedAction : "create";
 
   if (action === "remove") {
     const collaboratorId = String(body?.collaboratorId ?? "").trim();
@@ -95,6 +100,89 @@ Deno.serve(async (req: Request) => {
     return json({ ok: true, removed: { id: collaborator.id, name: collaborator.name } });
   }
 
+  if (action === "create_access") {
+    const collaboratorId = String(body?.collaboratorId ?? "").trim();
+    const username = String(body?.username ?? "").trim().toLowerCase();
+    const password = String(body?.password ?? "");
+
+    if (!collaboratorId) return json({ error: "Colaborador inválido." }, 400);
+    if (!validUsername(username)) {
+      return json({ error: "O usuário deve ter de 3 a 30 caracteres e usar apenas letras, números, ponto, hífen ou underline." }, 400);
+    }
+    if (password.length < 8) return json({ error: "A senha deve ter pelo menos 8 caracteres." }, 400);
+
+    const { data: collaborator, error: collaboratorError } = await admin
+      .from("collaborators")
+      .select("id, name, role, auth_user_id, is_active")
+      .eq("id", collaboratorId)
+      .eq("owner_id", owner.id)
+      .maybeSingle();
+
+    if (collaboratorError) return json({ error: "Não foi possível localizar o colaborador." }, 400);
+    if (!collaborator) return json({ error: "Colaborador não encontrado." }, 404);
+    if (!collaborator.is_active) return json({ error: "Este colaborador está desativado." }, 400);
+    if (collaborator.auth_user_id) return json({ error: "Este colaborador já possui acesso ao sistema." }, 409);
+
+    const { data: usernameOwner } = await admin
+      .from("collaborators")
+      .select("id")
+      .eq("username", username)
+      .neq("id", collaborator.id)
+      .maybeSingle();
+
+    if (usernameOwner) return json({ error: "Este usuário já está em uso." }, 409);
+
+    const internalEmail = `${username}@colaborador.sacoleiro.app`;
+    const { data: created, error: createError } = await admin.auth.admin.createUser({
+      email: internalEmail,
+      password,
+      email_confirm: true,
+      user_metadata: {
+        full_name: collaborator.name,
+        collaborator_username: username,
+      },
+      app_metadata: {
+        collaborator_id: collaborator.id,
+        collaborator_role: collaborator.role,
+      },
+    });
+
+    if (createError || !created.user) {
+      const message = createError?.message?.toLowerCase() ?? "";
+      if (message.includes("already") || message.includes("registered")) {
+        return json({ error: "Este usuário já está em uso." }, 409);
+      }
+      return json({ error: "Não foi possível criar o acesso do colaborador." }, 400);
+    }
+
+    const now = new Date().toISOString();
+    const { error: updateError } = await admin
+      .from("collaborators")
+      .update({
+        auth_user_id: created.user.id,
+        username,
+        email: internalEmail,
+        accepted_at: now,
+      })
+      .eq("id", collaborator.id)
+      .eq("owner_id", owner.id);
+
+    if (updateError) {
+      await admin.auth.admin.deleteUser(created.user.id);
+      return json({ error: "Não foi possível vincular o acesso ao colaborador." }, 400);
+    }
+
+    return json({
+      ok: true,
+      collaborator: {
+        id: collaborator.id,
+        name: collaborator.name,
+        username,
+        role: collaborator.role,
+      },
+    });
+  }
+
   const name = String(body?.name ?? "").trim();
   const username = String(body?.username ?? "").trim().toLowerCase();
   const password = String(body?.password ?? "");
@@ -102,7 +190,7 @@ Deno.serve(async (req: Request) => {
   const role = body?.role === "cobrador" ? "cobrador" : body?.role === "vendedor" ? "vendedor" : null;
 
   if (!name) return json({ error: "Informe o nome do colaborador." }, 400);
-  if (!/^[a-z0-9._-]{3,30}$/.test(username)) {
+  if (!validUsername(username)) {
     return json({ error: "O usuário deve ter de 3 a 30 caracteres e usar apenas letras, números, ponto, hífen ou underline." }, 400);
   }
   if (password.length < 8) return json({ error: "A senha deve ter pelo menos 8 caracteres." }, 400);
