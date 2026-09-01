@@ -10,6 +10,7 @@ import {
   ClipboardList,
   UserRoundCog,
   BadgeDollarSign,
+  HandCoins,
   type LucideIcon,
 } from "lucide-react";
 import type { AppRole } from "@/lib/access";
@@ -45,12 +46,14 @@ const SELLER_MAIN: NavItem[] = [
   { href: "/vender", label: "Vender", icon: ShoppingCart, permission: "vender" },
   { href: "/clientes", label: "Clientes", icon: Users, permission: "clientes" },
   { href: "/fichas", label: "Fichas", icon: ClipboardList, permission: "fichas" },
+  { href: "/meu-vale", label: "Meu Vale", icon: HandCoins },
 ];
 
 const COLLECTOR_MAIN: NavItem[] = [
   { href: "/cobrancas", label: "Cobranças", icon: BadgeDollarSign, permission: "cobrancas" },
   { href: "/clientes", label: "Clientes", icon: Users, permission: "clientes" },
   { href: "/fichas", label: "Fichas", icon: ClipboardList, permission: "fichas" },
+  { href: "/meu-vale", label: "Meu Vale", icon: HandCoins },
 ];
 
 export const MAIN_NAV = OWNER_MAIN;
