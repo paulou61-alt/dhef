@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { clsx } from "clsx";
-import { LogOut } from "lucide-react";
+import { LogOut, Sparkles } from "lucide-react";
 import { getMainNav, getSecondaryNav } from "@/lib/nav-items";
 import type { AppRole } from "@/lib/access";
 import type { ViewPermission } from "@/lib/permissions";
@@ -28,24 +28,49 @@ export function Sidebar({ role, displayName, viewPermissions = [] }: { role: App
     const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
     const Icon = item.icon;
     return (
-      <Link key={item.href} href={item.href} className={clsx("flex items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] font-medium transition", isActive ? "bg-brand-50 text-brand-700" : "text-slate-600 hover:bg-slate-50")}>
-        <Icon size={19} strokeWidth={isActive ? 2.5 : 2} />
+      <Link
+        key={item.href}
+        href={item.href}
+        className={clsx(
+          "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] font-medium transition duration-200",
+          isActive
+            ? "bg-gradient-to-r from-brand-50 to-brand-50/40 text-brand-700 shadow-sm ring-1 ring-brand-100"
+            : "text-slate-600 hover:bg-white hover:text-slate-900 hover:shadow-sm"
+        )}
+      >
+        <span className={clsx("flex h-8 w-8 items-center justify-center rounded-lg transition", isActive ? "bg-brand-500 text-white shadow-sm" : "bg-slate-100 text-slate-500 group-hover:bg-slate-200/70")}>
+          <Icon size={17} strokeWidth={isActive ? 2.5 : 2} />
+        </span>
         {item.label}
       </Link>
     );
   };
 
   return (
-    <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-slate-200 bg-white px-4 py-6 md:flex">
-      <div className="mb-6 px-2">
-        <div className="flex items-center gap-2"><div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-500 text-base font-bold text-white">V</div><span className="text-[15px] font-bold text-slate-900">Controle de Vendas</span></div>
-        <div className="mt-3 rounded-xl bg-surface-muted px-3 py-2"><p className="truncate text-xs font-semibold text-slate-700">{displayName || ROLE_LABELS[role]}</p><p className="text-[11px] text-slate-400">{ROLE_LABELS[role]}</p></div>
+    <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-slate-200/80 bg-slate-50/95 px-4 py-5 backdrop-blur-xl md:flex">
+      <div className="mb-6 px-1">
+        <div className="flex items-center gap-3 rounded-2xl bg-slate-950 px-3 py-3 text-white shadow-floating">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500 text-base font-black shadow-sm">V</div>
+          <div className="min-w-0">
+            <p className="truncate text-[14px] font-bold">Controle de Vendas</p>
+            <p className="mt-0.5 flex items-center gap-1 text-[10px] font-medium text-slate-400"><Sparkles size={11} /> Gestão do negócio</p>
+          </div>
+        </div>
+        <div className="mt-3 rounded-xl border border-slate-200/70 bg-white px-3 py-2.5 shadow-sm">
+          <p className="truncate text-xs font-bold text-slate-800">{displayName || ROLE_LABELS[role]}</p>
+          <p className="mt-0.5 text-[11px] text-slate-400">{ROLE_LABELS[role]}</p>
+        </div>
       </div>
+
       <nav className="flex flex-1 flex-col gap-1">
         {mainNav.map(renderLink)}
-        {secondaryNav.length > 0 && <><div className="my-3 h-px bg-slate-100" />{secondaryNav.map(renderLink)}</>}
+        {secondaryNav.length > 0 && <><div className="my-3 h-px bg-slate-200/70" />{secondaryNav.map(renderLink)}</>}
       </nav>
-      <button onClick={handleLogout} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] font-medium text-slate-500 transition hover:bg-slate-50"><LogOut size={19} />Sair</button>
+
+      <button onClick={handleLogout} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] font-medium text-slate-500 transition hover:bg-white hover:text-danger hover:shadow-sm">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100"><LogOut size={17} /></span>
+        Sair
+      </button>
     </aside>
   );
 }
