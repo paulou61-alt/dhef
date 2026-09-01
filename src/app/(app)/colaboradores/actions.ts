@@ -13,6 +13,12 @@ export interface CreateCollaboratorInput {
   viewPermissions: ViewPermission[];
 }
 
+export interface CreateCollaboratorAccessInput {
+  collaboratorId: string;
+  username: string;
+  password: string;
+}
+
 export interface CollaboratorValeInput {
   collaboratorId: string;
   movementType: "vale" | "abatimento";
@@ -78,6 +84,37 @@ export async function createCollaborator(
 
   revalidatePath("/colaboradores");
   revalidatePath("/fichas");
+  return { success: true };
+}
+
+export async function createCollaboratorAccess(
+  input: CreateCollaboratorAccessInput
+): Promise<{ error?: string; success?: boolean }> {
+  const access = await getAccessContext();
+  if (!access || access.role !== "owner") {
+    return { error: "Apenas o proprietário pode criar acessos de colaboradores." };
+  }
+
+  const collaboratorId = input.collaboratorId?.trim();
+  const username = input.username?.trim().toLowerCase();
+  const password = input.password ?? "";
+
+  if (!collaboratorId) return { error: "Colaborador inválido." };
+  if (!/^[a-z0-9._-]{3,30}$/.test(username)) {
+    return { error: "O usuário deve ter de 3 a 30 caracteres e usar apenas letras, números, ponto, hífen ou underline." };
+  }
+  if (password.length < 8) return { error: "A senha deve ter pelo menos 8 caracteres." };
+
+  const result = await callCollaboratorManager({
+    action: "create_access",
+    collaboratorId,
+    username,
+    password,
+  });
+
+  if (!result.ok) return { error: result.error || "Não foi possível criar o acesso do colaborador." };
+
+  revalidatePath("/colaboradores");
   return { success: true };
 }
 
