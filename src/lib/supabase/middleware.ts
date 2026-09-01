@@ -74,7 +74,8 @@ export async function updateSession(request: NextRequest) {
     const permissions = normalizeViewPermissions(collaborator.role, collaborator.view_permissions);
     const requiredPermission = permissionForPath(pathname);
     const target = firstAllowedPath(collaborator.role, permissions);
-    const isAllowedRoute = requiredPermission !== null && permissions.includes(requiredPermission);
+    const isOwnValeRoute = pathname === "/meu-vale" || pathname.startsWith("/meu-vale/");
+    const isAllowedRoute = isOwnValeRoute || (requiredPermission !== null && permissions.includes(requiredPermission));
 
     if (!isAllowedRoute && target !== pathname && target !== "/login") {
       const url = request.nextUrl.clone();
