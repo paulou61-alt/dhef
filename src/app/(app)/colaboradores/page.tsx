@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAccessContext } from "@/lib/access";
 import { CollaboratorForm } from "@/components/collaborators/CollaboratorForm";
 import { CollaboratorProfileCard } from "@/components/collaborators/CollaboratorProfileCard";
+import { CollaboratorAccessButton } from "@/components/collaborators/CollaboratorAccessButton";
 import { normalizeViewPermissions } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
@@ -102,18 +103,30 @@ export default async function ColaboradoresPage() {
             {collaborators.map((collaborator) => {
               const role = collaborator.role as "vendedor" | "cobrador";
               const salesMetric = salesTotals.get(collaborator.id) ?? { total: 0, count: 0 };
+              const hasAccess = Boolean(collaborator.auth_user_id && collaborator.accepted_at && collaborator.is_active);
+
               return (
-                <CollaboratorProfileCard
-                  key={collaborator.id}
-                  collaborator={{ id: collaborator.id, name: collaborator.name, phone: collaborator.phone, role }}
-                  hasAccess={Boolean(collaborator.auth_user_id && collaborator.accepted_at && collaborator.is_active)}
-                  viewPermissions={normalizeViewPermissions(role, collaborator.view_permissions as string[] | null)}
-                  salesTotal={salesMetric.total}
-                  salesCount={salesMetric.count}
-                  collectionsTotal={collectionTotals.get(collaborator.id) ?? 0}
-                  valeBalance={Math.max(0, valeBalances.get(collaborator.id) ?? 0)}
-                  valeMovements={valesByCollaborator.get(collaborator.id) ?? []}
-                />
+                <div key={collaborator.id}>
+                  <CollaboratorProfileCard
+                    collaborator={{ id: collaborator.id, name: collaborator.name, phone: collaborator.phone, role }}
+                    hasAccess={hasAccess}
+                    viewPermissions={normalizeViewPermissions(role, collaborator.view_permissions as string[] | null)}
+                    salesTotal={salesMetric.total}
+                    salesCount={salesMetric.count}
+                    collectionsTotal={collectionTotals.get(collaborator.id) ?? 0}
+                    valeBalance={Math.max(0, valeBalances.get(collaborator.id) ?? 0)}
+                    valeMovements={valesByCollaborator.get(collaborator.id) ?? []}
+                  />
+
+                  {!hasAccess && (
+                    <div className="flex justify-end px-4 pb-3">
+                      <CollaboratorAccessButton
+                        collaboratorId={collaborator.id}
+                        collaboratorName={collaborator.name}
+                      />
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>
