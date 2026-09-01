@@ -6,26 +6,51 @@
   html {
     -webkit-tap-highlight-color: transparent;
   }
+
+  body {
+    @apply bg-slate-50 text-slate-900;
+  }
+
   input,
   select,
   textarea {
     @apply text-base; /* evita zoom automático no iOS */
   }
+
+  ::selection {
+    @apply bg-brand-100 text-brand-900;
+  }
 }
 
 @layer components {
   .card {
-    @apply rounded-2xl bg-white p-4 shadow-card;
+    @apply rounded-2xl border border-slate-200/70 bg-white p-4 shadow-card;
   }
+
+  .card-soft {
+    @apply rounded-2xl border border-slate-200/60 bg-white/80 p-4 shadow-card backdrop-blur;
+  }
+
+  .section-title {
+    @apply text-[15px] font-bold tracking-tight text-slate-900;
+  }
+
+  .eyebrow {
+    @apply text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400;
+  }
+
   .btn-primary {
-    @apply flex items-center justify-center gap-2 rounded-xl bg-brand-500 px-5 py-3.5 text-[15px] font-semibold text-white shadow-card transition active:scale-[0.98] active:bg-brand-600 disabled:opacity-50;
+    @apply flex items-center justify-center gap-2 rounded-xl bg-brand-500 px-5 py-3.5 text-[15px] font-semibold text-white shadow-card transition duration-200 hover:bg-brand-600 hover:shadow-floating active:scale-[0.98] disabled:opacity-50;
   }
+
   .btn-secondary {
-    @apply flex items-center justify-center gap-2 rounded-xl bg-surface-muted px-5 py-3.5 text-[15px] font-semibold text-slate-700 transition active:scale-[0.98] active:bg-slate-200;
+    @apply flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3.5 text-[15px] font-semibold text-slate-700 shadow-card transition duration-200 hover:border-slate-300 hover:bg-slate-50 active:scale-[0.98];
   }
+
   .input-field {
-    @apply w-full rounded-xl border border-slate-200 bg-white px-4 py-3.5 text-[15px] placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100;
+    @apply w-full rounded-xl border border-slate-200 bg-white px-4 py-3.5 text-[15px] shadow-sm placeholder:text-slate-400 focus:border-brand-400 focus:outline-none focus:ring-4 focus:ring-brand-100/70;
   }
+
   .label {
     @apply mb-1.5 block text-[13px] font-medium text-slate-600;
   }
