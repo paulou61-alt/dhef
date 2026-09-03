@@ -161,7 +161,7 @@ export async function createCustomer(formData: FormData): Promise<CustomerFormSt
   revalidatePath("/receber");
   revalidatePath("/cobrancas");
   revalidatePath("/vender");
-  redirect(`/clientes/${data.id}`);
+  redirect(`/clientes/${data.id}?created=1`);
 }
 
 export async function updateCustomer(customerId: string, formData: FormData): Promise<CustomerFormState> {

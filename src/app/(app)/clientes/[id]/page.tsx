@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeft, MessageCircle, Pencil, MapPin } from "lucide-react";
+import { ChevronLeft, MessageCircle, Pencil, MapPin, Plus, CheckCircle2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { CustomerStat } from "@/components/customers/CustomerStat";
 import { DeleteButton } from "@/components/ui/DeleteButton";
@@ -17,7 +17,7 @@ const STATUS_LABELS: Record<string, { label: string; className: string }> = {
   pago: { label: "Pago", className: "bg-success/10 text-success" },
 };
 
-export default async function CustomerDetailPage({ params }: { params: { id: string } }) {
+export default async function CustomerDetailPage({ params, searchParams }: { params: { id: string }; searchParams?: { created?: string } }) {
   const supabase = createClient();
 
   const { data: customer } = await supabase
@@ -119,6 +119,27 @@ export default async function CustomerDetailPage({ params }: { params: { id: str
           </a>
         )}
       </div>
+
+      {searchParams?.created === "1" && (
+        <div className="rounded-2xl border border-success/20 bg-success/5 p-4">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-success/10 text-success">
+              <CheckCircle2 size={19} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold text-slate-900">Cliente cadastrado com sucesso</p>
+              <p className="mt-0.5 text-xs text-slate-500">Quer continuar cadastrando? Use o atalho abaixo.</p>
+              <Link
+                href="/clientes/novo"
+                className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-brand-500 px-4 py-3 text-sm font-semibold text-white shadow-sm active:scale-[0.99] sm:w-auto sm:inline-flex"
+              >
+                <Plus size={17} />
+                Cadastrar outro cliente
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
 
       {pendingInstallments.length > 0 && (
         <div className="card">
