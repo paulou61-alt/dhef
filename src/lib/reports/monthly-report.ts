@@ -43,7 +43,7 @@ export async function getMonthlyBusinessReport(monthValue?: string | null) {
     { data: monthCashMovements },
   ] = await Promise.all([
     supabase.from("profiles").select("full_name, business_name, phone").eq("id", access.ownerId).maybeSingle(),
-    supabase.from("sales").select("id, customer_id, sale_number, status, payment_method, total, down_payment, is_paid, created_at, created_by_collaborator_id").neq("status", "cancelled").order("created_at"),
+    supabase.from("sales").select("id, customer_id, sale_number, status, payment_method, total, down_payment, is_paid, is_opening_balance, created_at, created_by_collaborator_id").neq("status", "cancelled").order("created_at"),
     supabase.from("customers").select("id, name, ficha_number, phone, city, state").order("name"),
     supabase.from("expenses").select("id, description, category, amount, expense_date, notes").gte("expense_date", monthStart).lt("expense_date", nextMonth).order("expense_date"),
     supabase.from("payments").select("id, installment_id, amount, payment_method, payment_date, notes, collected_by_collaborator_id").gte("payment_date", monthStart).lt("payment_date", nextMonth).order("payment_date"),
@@ -55,7 +55,8 @@ export async function getMonthlyBusinessReport(monthValue?: string | null) {
     supabase.from("cash_movements").select("type, origin, amount, created_at").gte("created_at", monthStartTs).lt("created_at", nextMonthTs),
   ]);
 
-  const completedSales = (allSales ?? []).filter((sale) => sale.status === "completed");
+  const completedEntries = (allSales ?? []).filter((sale) => sale.status === "completed");
+  const completedSales = completedEntries.filter((sale) => !sale.is_opening_balance);
   const monthSales = completedSales.filter((sale) => String(sale.created_at).slice(0, 7) === monthKey);
   const monthSaleIds = monthSales.map((sale) => sale.id);
 
@@ -67,7 +68,7 @@ export async function getMonthlyBusinessReport(monthValue?: string | null) {
     : { data: [] as any[] };
 
   const customerMap = new Map((customers ?? []).map((customer) => [customer.id, customer]));
-  const saleMap = new Map(completedSales.map((sale) => [sale.id, sale]));
+  const saleMap = new Map(completedEntries.map((sale) => [sale.id, sale]));
   const installmentMap = new Map((installments ?? []).map((installment) => [installment.id, installment]));
   const collaboratorMap = new Map((collaborators ?? []).map((collaborator) => [collaborator.id, collaborator]));
   const productMap = new Map((products ?? []).map((product) => [product.id, product]));
@@ -94,7 +95,8 @@ export async function getMonthlyBusinessReport(monthValue?: string | null) {
       return {
         customer: customer?.name ?? "Cliente",
         fichaNumber: customer?.ficha_number ?? null,
-        saleNumber: sale?.sale_number ?? null,
+        saleNumber: sale?.is_opening_balance ? null : sale?.sale_number ?? null,
+        reference: sale?.is_opening_balance ? "Saldo devedor inicial" : "Parcela de venda",
         installmentNumber: installment.installment_number,
         totalInstallments: installment.total_installments,
         dueDate: installment.due_date,
@@ -156,7 +158,8 @@ export async function getMonthlyBusinessReport(monthValue?: string | null) {
     return {
       date: payment.payment_date,
       customer: customer?.name ?? "Cliente",
-      saleNumber: sale?.sale_number ?? null,
+      saleNumber: sale?.is_opening_balance ? null : sale?.sale_number ?? null,
+      reference: sale?.is_opening_balance ? "Saldo devedor inicial" : "Parcela de venda",
       method: payment.payment_method,
       amount: Number(payment.amount),
       collector: payment.collected_by_collaborator_id ? collaboratorMap.get(payment.collected_by_collaborator_id)?.name ?? "Colaborador" : "Proprietário",
