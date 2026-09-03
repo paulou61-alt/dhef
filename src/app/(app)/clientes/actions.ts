@@ -34,8 +34,8 @@ function buildCustomerPayload(formData: FormData) {
   }
 
   const fichaNumber = Number(fichaNumberRaw);
-  if (!Number.isSafeInteger(fichaNumber) || fichaNumber <= 0) {
-    throw new Error("O número da ficha deve ser maior que zero.");
+  if (!Number.isSafeInteger(fichaNumber) || fichaNumber < 1 || fichaNumber > 1000) {
+    throw new Error("O número da ficha deve estar entre 1 e 1000.");
   }
 
   const creditLimitRaw = getStringField(formData, "credit_limit");
@@ -58,12 +58,13 @@ function buildCustomerPayload(formData: FormData) {
 
 function customerWriteError(error: any, fallback: string) {
   if (error?.code === "23505") {
-    return "Já existe uma ficha com esse número. Escolha outro número.";
+    return "Essa ficha já existe para o colaborador selecionado. Use outro número entre 1 e 1000.";
   }
 
   const message = String(error?.message ?? "").toLowerCase();
   if (message.includes("número da ficha é obrigatório")) return "Informe o número da ficha.";
-  if (message.includes("número da ficha deve ser maior")) return "O número da ficha deve ser maior que zero.";
+  if (message.includes("número da ficha deve estar entre")) return "O número da ficha deve estar entre 1 e 1000.";
+  if (message.includes("número da ficha deve ser maior")) return "O número da ficha deve estar entre 1 e 1000.";
   if (message.includes("numeração da ficha não pode ser alterada")) return "O número da ficha não pode ser alterado depois do cadastro.";
   if (message.includes("colaborador responsável inválido")) return "Revise o colaborador responsável.";
   return fallback;
@@ -137,6 +138,8 @@ export async function updateCustomer(customerId: string, formData: FormData): Pr
   revalidatePath(`/clientes/${customerId}`);
   revalidatePath("/fichas");
   revalidatePath(`/fichas/${customerId}`);
+  revalidatePath("/receber");
+  revalidatePath("/cobrancas");
   redirect(`/clientes/${customerId}`);
 }
 
@@ -150,5 +153,7 @@ export async function deleteCustomer(customerId: string): Promise<{ error?: stri
 
   revalidatePath("/clientes");
   revalidatePath("/fichas");
+  revalidatePath("/receber");
+  revalidatePath("/cobrancas");
   redirect("/clientes");
 }
