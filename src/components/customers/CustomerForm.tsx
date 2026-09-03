@@ -4,6 +4,12 @@ import { useState, useTransition } from "react";
 import { maskPhone, maskCEP, maskCPF, maskCurrencyInput } from "@/utils/masks";
 import type { Customer } from "@/types/database.types";
 import type { CustomerFormState } from "@/app/(app)/clientes/actions";
+import {
+  PurchaseProductSelector,
+  type PurchaseItem,
+  type PurchaseProduct,
+  type PurchaseVariant,
+} from "@/components/sales/PurchaseProductSelector";
 
 const BR_STATES = [
   "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG",
@@ -20,11 +26,15 @@ export function CustomerForm({
   customer,
   action,
   collaborators = [],
+  products = [],
+  variants = [],
   accessRole = "owner",
 }: {
   customer?: Customer;
   action: (formData: FormData) => Promise<CustomerFormState>;
   collaborators?: CustomerCollaboratorOption[];
+  products?: PurchaseProduct[];
+  variants?: PurchaseVariant[];
   accessRole?: "owner" | "vendedor" | "cobrador";
 }) {
   const [phone, setPhone] = useState(customer?.phone ?? "");
@@ -35,18 +45,28 @@ export function CustomerForm({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [sameAsPhone, setSameAsPhone] = useState(!customer?.whatsapp || customer.whatsapp === customer.phone);
+  const [initialItems, setInitialItems] = useState<PurchaseItem[]>([]);
+  const [initialPaymentMethod, setInitialPaymentMethod] = useState("parcelado");
+  const [initialInstallments, setInitialInstallments] = useState("2");
+  const [initialFirstDueDate, setInitialFirstDueDate] = useState(() => new Date().toISOString().slice(0, 10));
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
     const formData = new FormData(e.currentTarget);
     if (sameAsPhone) formData.set("whatsapp", phone);
+    formData.set(
+      "initial_purchase_items",
+      JSON.stringify(initialItems.map((item) => ({ product_variant_id: item.variantId, quantity: item.quantity })))
+    );
 
     startTransition(async () => {
       const result = await action(formData);
       if (result?.error) setError(result.error);
     });
   }
+
+  const initialNeedsTerms = initialPaymentMethod === "fiado" || initialPaymentMethod === "parcelado";
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
@@ -156,6 +176,90 @@ export function CustomerForm({
           </div>
         </div>
       </section>
+
+      {!customer && (
+        <section className="card space-y-4">
+          <div>
+            <h2 className="text-[14px] font-bold text-slate-900">Primeira compra (opcional)</h2>
+            <p className="mt-1 text-xs text-slate-500">Selecione os produtos agora para cadastrar o cliente e a primeira venda de uma vez.</p>
+          </div>
+
+          <PurchaseProductSelector
+            products={products}
+            variants={variants}
+            items={initialItems}
+            onChange={setInitialItems}
+          />
+
+          {initialItems.length > 0 && (
+            <div className="space-y-3 rounded-2xl bg-surface-muted p-4">
+              <div>
+                <label className="label" htmlFor="initial_payment_method">Forma de pagamento</label>
+                <select
+                  id="initial_payment_method"
+                  name="initial_payment_method"
+                  className="input-field bg-white"
+                  value={initialPaymentMethod}
+                  onChange={(e) => setInitialPaymentMethod(e.target.value)}
+                >
+                  <option value="parcelado">Parcelado</option>
+                  <option value="fiado">Fiado</option>
+                  <option value="pix">Pix</option>
+                  <option value="dinheiro">Dinheiro</option>
+                  <option value="cartao">Cartão</option>
+                </select>
+              </div>
+
+              {initialNeedsTerms && (
+                <>
+                  <div>
+                    <label className="label" htmlFor="initial_down_payment">Entrada</label>
+                    <input
+                      id="initial_down_payment"
+                      name="initial_down_payment"
+                      className="input-field bg-white"
+                      placeholder="0,00"
+                      inputMode="numeric"
+                      onInput={(e) => { e.currentTarget.value = maskCurrencyInput(e.currentTarget.value); }}
+                    />
+                  </div>
+                  {initialPaymentMethod === "parcelado" && (
+                    <div>
+                      <label className="label" htmlFor="initial_installments_count">Quantidade de parcelas</label>
+                      <input
+                        id="initial_installments_count"
+                        name="initial_installments_count"
+                        className="input-field bg-white"
+                        type="number"
+                        min="1"
+                        max="36"
+                        value={initialInstallments}
+                        onChange={(e) => setInitialInstallments(e.target.value)}
+                      />
+                    </div>
+                  )}
+                  <div>
+                    <label className="label" htmlFor="initial_first_due_date">Primeiro vencimento</label>
+                    <input
+                      id="initial_first_due_date"
+                      name="initial_first_due_date"
+                      className="input-field bg-white"
+                      type="date"
+                      value={initialFirstDueDate}
+                      onChange={(e) => setInitialFirstDueDate(e.target.value)}
+                    />
+                  </div>
+                </>
+              )}
+
+              <div>
+                <label className="label" htmlFor="initial_purchase_notes">Observação da compra</label>
+                <input id="initial_purchase_notes" name="initial_purchase_notes" className="input-field bg-white" placeholder="Opcional" />
+              </div>
+            </div>
+          )}
+        </section>
+      )}
 
       <section className="card space-y-4">
         <h2 className="text-[14px] font-bold text-slate-900">Outros</h2>
