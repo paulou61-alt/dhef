@@ -47,7 +47,7 @@ export function SaleForm({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [customerId, setCustomerId] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("pix");
+  const [paymentMethod, setPaymentMethod] = useState("parcelado");
   const [downPayment, setDownPayment] = useState("");
   const [installmentsCount, setInstallmentsCount] = useState("2");
   const [firstDueDate, setFirstDueDate] = useState(() => new Date().toISOString().slice(0, 10));

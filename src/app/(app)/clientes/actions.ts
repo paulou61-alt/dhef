@@ -16,6 +16,14 @@ function getStringField(formData: FormData, key: string): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function parseCurrencyField(formData: FormData, key: string): number | null {
+  const raw = getStringField(formData, key);
+  if (!raw) return null;
+  const value = Number(raw.replace(/\./g, "").replace(",", "."));
+  if (!Number.isFinite(value) || value < 0) throw new Error("Informe um valor válido.");
+  return value;
+}
+
 function buildCustomerPayload(formData: FormData) {
   const name = getStringField(formData, "name");
   if (!name) throw new Error("O nome do cliente é obrigatório.");
@@ -67,7 +75,13 @@ export async function createCustomer(formData: FormData): Promise<CustomerFormSt
   if (access.role === "cobrador") return { error: "Cobradores não podem cadastrar clientes." };
 
   let payload;
-  try { payload = buildCustomerPayload(formData); } catch (e: any) { return { error: e.message }; }
+  let openingBalance: number | null;
+  try {
+    payload = buildCustomerPayload(formData);
+    openingBalance = parseCurrencyField(formData, "opening_balance");
+  } catch (e: any) {
+    return { error: e.message };
+  }
 
   if (access.role === "vendedor") payload.assigned_collaborator_id = access.collaboratorId;
 
@@ -80,8 +94,23 @@ export async function createCustomer(formData: FormData): Promise<CustomerFormSt
 
   if (error) return { error: customerWriteError(error, "Não foi possível salvar o cliente. Tente novamente.") };
 
+  if (openingBalance && openingBalance > 0) {
+    const { error: openingBalanceError } = await supabase.rpc("create_customer_opening_balance", {
+      p_customer_id: data.id,
+      p_amount: openingBalance,
+      p_due_date: new Date().toISOString().slice(0, 10),
+    });
+
+    if (openingBalanceError) {
+      await supabase.from("customers").delete().eq("id", data.id).eq("user_id", access.ownerId);
+      return { error: "Não foi possível registrar o saldo devedor inicial. O cliente não foi salvo; tente novamente." };
+    }
+  }
+
   revalidatePath("/clientes");
   revalidatePath("/fichas");
+  revalidatePath("/receber");
+  revalidatePath("/cobrancas");
   redirect(`/clientes/${data.id}`);
 }
 

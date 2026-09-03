@@ -36,7 +36,7 @@ export default async function FichasPage({ searchParams }: { searchParams: Searc
   const [{ data: customers }, { data: collaborators }, { data: sales }, { data: installments }] = await Promise.all([
     customerQuery,
     supabase.from("collaborators").select("id, name, role").eq("is_active", true).order("name"),
-    supabase.from("sales").select("id, customer_id, total, status").eq("status", "completed"),
+    supabase.from("sales").select("id, customer_id, total, status, is_opening_balance").eq("status", "completed"),
     supabase.from("installments").select("sale_id, amount, paid_amount, status"),
   ]);
 
@@ -45,8 +45,10 @@ export default async function FichasPage({ searchParams }: { searchParams: Searc
   (sales ?? []).forEach((sale) => {
     if (!sale.customer_id) return;
     const current = salesByCustomer.get(sale.customer_id) ?? { count: 0, total: 0, saleIds: [] };
-    current.count += 1;
-    current.total += Number(sale.total);
+    if (!sale.is_opening_balance) {
+      current.count += 1;
+      current.total += Number(sale.total);
+    }
     current.saleIds.push(sale.id);
     salesByCustomer.set(sale.customer_id, current);
   });

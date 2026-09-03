@@ -23,7 +23,7 @@ export default async function ClientesPage({ searchParams }: { searchParams: { q
   const [{ data: customers }, { data: openInstallments }, { data: sales }] = await Promise.all([
     customersQuery,
     supabase.from("installments").select("id, sale_id, installment_number, total_installments, amount, paid_amount, due_date, status").in("status", ["pendente", "parcial", "vencido"]),
-    supabase.from("sales").select("id, customer_id, sale_number").neq("status", "cancelled"),
+    supabase.from("sales").select("id, customer_id, sale_number, is_opening_balance").neq("status", "cancelled"),
   ]);
 
   const saleMap = new Map((sales ?? []).map((sale) => [sale.id, sale]));
@@ -39,6 +39,7 @@ export default async function ClientesPage({ searchParams }: { searchParams: { q
       dueDate: item.due_date,
       openAmount: Number(item.amount) - Number(item.paid_amount),
       status: item.status,
+      isOpeningBalance: Boolean(sale.is_opening_balance),
     };
     chargesByCustomer.set(sale.customer_id, [...(chargesByCustomer.get(sale.customer_id) ?? []), charge]);
   });

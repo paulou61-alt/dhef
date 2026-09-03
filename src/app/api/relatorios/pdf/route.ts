@@ -52,15 +52,15 @@ export async function GET(request: Request) {
       ),
     },
     {
-      title: "Recebimentos de parcelas no mês",
+      title: "Recebimentos no mês",
       lines: report.paymentRows.map(
-        (payment) => `${formatDate(payment.date)} | ${payment.customer}${payment.saleNumber ? ` | Venda #${payment.saleNumber}` : ""} | ${paymentLabels[payment.method] ?? payment.method} | Recebido por: ${payment.collector} | ${formatCurrency(payment.amount)}`,
+        (payment) => `${formatDate(payment.date)} | ${payment.customer} | ${payment.reference}${payment.saleNumber ? ` #${payment.saleNumber}` : ""} | ${paymentLabels[payment.method] ?? payment.method} | Recebido por: ${payment.collector} | ${formatCurrency(payment.amount)}`,
       ),
     },
     {
       title: "Carteira atual a receber",
       lines: report.openReceivablesRows.map(
-        (row) => `${row.overdue ? "VENCIDO" : "EM ABERTO"} | ${row.customer}${row.fichaNumber ? ` | Ficha ${row.fichaNumber}` : ""}${row.saleNumber ? ` | Venda #${row.saleNumber}` : ""} | Parcela ${row.installmentNumber}/${row.totalInstallments} | Vencimento ${formatDate(row.dueDate)} | ${formatCurrency(row.openAmount)}`,
+        (row) => `${row.overdue ? "VENCIDO" : "EM ABERTO"} | ${row.customer}${row.fichaNumber ? ` | Ficha ${row.fichaNumber}` : ""} | ${row.reference}${row.saleNumber ? ` #${row.saleNumber}` : ""}${row.saleNumber ? ` | Parcela ${row.installmentNumber}/${row.totalInstallments}` : ""} | Vencimento ${formatDate(row.dueDate)} | ${formatCurrency(row.openAmount)}`,
       ),
     },
     {
