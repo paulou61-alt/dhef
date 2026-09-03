@@ -12,11 +12,22 @@ export default async function NovoClientePage() {
   if (access.role === "cobrador") redirect("/cobrancas");
 
   const supabase = createClient();
-  const { data: collaborators } = await supabase
-    .from("collaborators")
-    .select("id, name, role")
-    .eq("is_active", true)
-    .order("name");
+  const [{ data: collaborators }, { data: products }, { data: variants }] = await Promise.all([
+    supabase
+      .from("collaborators")
+      .select("id, name, role")
+      .eq("is_active", true)
+      .order("name"),
+    supabase
+      .from("products")
+      .select("id, name, sale_price")
+      .eq("is_active", true)
+      .order("name"),
+    supabase
+      .from("product_variants")
+      .select("id, product_id, variant_name, stock_quantity, sale_price")
+      .order("variant_name"),
+  ]);
 
   return (
     <div className="space-y-4">
@@ -24,7 +35,13 @@ export default async function NovoClientePage() {
         <ChevronLeft size={18} /> Clientes
       </Link>
       <h1 className="text-xl font-bold text-slate-900">Novo cliente</h1>
-      <CustomerForm action={createCustomer} collaborators={(collaborators ?? []) as any} accessRole={access.role} />
+      <CustomerForm
+        action={createCustomer}
+        collaborators={(collaborators ?? []) as any}
+        products={(products ?? []) as any}
+        variants={(variants ?? []) as any}
+        accessRole={access.role}
+      />
     </div>
   );
 }
