@@ -1,3 +1,4 @@
+import { Search } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { ReceiveButton } from "@/components/finance/ReceiveButton";
 import { formatCurrency, formatDate } from "@/utils/format";
@@ -49,7 +50,19 @@ function phoneLabel(customer: CustomerSummary | null) {
   return customer.whatsapp || customer.phone || "Não informado";
 }
 
-export default async function ReceberPage() {
+function normalizeSearch(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+export default async function ReceberPage({
+  searchParams,
+}: {
+  searchParams?: { q?: string };
+}) {
   const supabase = createClient();
   const [{ data: installments }, { data: sales }, { data: customers }] = await Promise.all([
     supabase.from("installments").select("*").in("status", ["pendente", "parcial", "vencido"]).order("due_date"),
@@ -90,10 +103,25 @@ export default async function ReceberPage() {
   }
 
   const debtors = Array.from(debtorMap.values()).sort((a, b) => {
-    if (a.overdue !== b.overdue) return b.overdue - a.overdue;
-    if (a.nextDue && b.nextDue && a.nextDue !== b.nextDue) return a.nextDue.localeCompare(b.nextDue);
-    return b.total - a.total;
+    const fichaA = a.customer?.ficha_number;
+    const fichaB = b.customer?.ficha_number;
+
+    if (fichaA != null && fichaB != null && fichaA !== fichaB) return fichaA - fichaB;
+    if (fichaA != null && fichaB == null) return -1;
+    if (fichaA == null && fichaB != null) return 1;
+
+    return (a.customer?.name ?? "").localeCompare(b.customer?.name ?? "", "pt-BR");
   });
+
+  const rawQuery = searchParams?.q ?? "";
+  const query = normalizeSearch(rawQuery);
+  const filteredDebtors = query
+    ? debtors.filter((debtor) => {
+        const ficha = debtor.customer?.ficha_number != null ? String(debtor.customer.ficha_number) : "";
+        const name = normalizeSearch(debtor.customer?.name ?? "");
+        return ficha.includes(query.replace(/\D/g, "")) || name.includes(query);
+      })
+    : debtors;
 
   const totalOpen = debtors.reduce((sum, debtor) => sum + debtor.total, 0);
   const totalInstallments = debtors.reduce((sum, debtor) => sum + debtor.items.length, 0);
@@ -113,17 +141,53 @@ export default async function ReceberPage() {
         </div>
       </div>
 
+      <div className="card">
+        <div className="mb-3">
+          <p className="text-sm font-semibold text-slate-800">Pesquisar ficha</p>
+          <p className="mt-0.5 text-xs text-slate-500">Digite o número da ficha ou o nome do cliente.</p>
+        </div>
+        <form method="get" className="flex flex-col gap-2 sm:flex-row">
+          <div className="relative min-w-0 flex-1">
+            <Search size={17} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="search"
+              name="q"
+              defaultValue={rawQuery}
+              className="input-field pl-10"
+              placeholder="Ex.: 123 ou Maria"
+              autoComplete="off"
+            />
+          </div>
+          <button type="submit" className="btn-primary sm:!w-auto sm:px-5">Pesquisar</button>
+          {query && (
+            <a href="/receber" className="inline-flex h-12 items-center justify-center rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
+              Limpar
+            </a>
+          )}
+        </form>
+        {query && (
+          <p className="mt-3 text-xs text-slate-500">
+            {filteredDebtors.length} resultado(s) encontrado(s) para <span className="font-semibold text-slate-700">“{rawQuery}”</span>.
+          </p>
+        )}
+      </div>
+
       {debtors.length === 0 ? (
         <div className="card py-12 text-center text-sm text-slate-500">Nenhum cliente com valor em aberto.</div>
+      ) : filteredDebtors.length === 0 ? (
+        <div className="card py-12 text-center">
+          <p className="text-sm font-semibold text-slate-700">Nenhuma ficha encontrada.</p>
+          <p className="mt-1 text-xs text-slate-500">Tente pesquisar por outro número de ficha ou nome.</p>
+        </div>
       ) : (
         <div className="card overflow-hidden !p-0">
           <div className="border-b border-slate-100 px-4 py-3">
-            <p className="text-sm font-semibold text-slate-800">Clientes devendo</p>
-            <p className="text-xs text-slate-500">Clique em um cliente para ver os dados e as parcelas em aberto.</p>
+            <p className="text-sm font-semibold text-slate-800">Clientes devendo por número de ficha</p>
+            <p className="text-xs text-slate-500">Ordenados pela ficha. Clique em um cliente para ver os dados e as parcelas em aberto.</p>
           </div>
 
           <div className="divide-y divide-slate-100">
-            {debtors.map((debtor) => {
+            {filteredDebtors.map((debtor) => {
               const customerName = debtor.customer?.name ?? "Cliente não informado";
               const initial = customerName.trim().charAt(0).toUpperCase() || "?";
 
@@ -135,9 +199,15 @@ export default async function ReceberPage() {
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-slate-900">{customerName}</p>
-                      <p className="mt-0.5 text-xs text-slate-500">
-                        {debtor.customer?.ficha_number ? `Ficha #${debtor.customer.ficha_number} · ` : ""}
+                      <div className="flex flex-wrap items-center gap-2">
+                        {debtor.customer?.ficha_number != null && (
+                          <span className="rounded-lg bg-brand-50 px-2 py-1 text-[11px] font-bold text-brand-700">
+                            Ficha #{debtor.customer.ficha_number}
+                          </span>
+                        )}
+                        <p className="truncate text-sm font-semibold text-slate-900">{customerName}</p>
+                      </div>
+                      <p className="mt-1 text-xs text-slate-500">
                         {debtor.items.length} parcela(s) em aberto
                         {debtor.overdue > 0 ? ` · ${debtor.overdue} vencida(s)` : ""}
                       </p>
@@ -154,7 +224,11 @@ export default async function ReceberPage() {
                   </summary>
 
                   <div className="border-t border-slate-100 bg-slate-50/70 px-4 py-4">
-                    <div className="mb-4 grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-white p-3 sm:grid-cols-3">
+                    <div className="mb-4 grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-white p-3 sm:grid-cols-4">
+                      <div>
+                        <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Ficha</p>
+                        <p className="mt-1 text-sm font-bold text-brand-700">#{debtor.customer?.ficha_number ?? "-"}</p>
+                      </div>
                       <div>
                         <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Cliente</p>
                         <p className="mt-1 text-sm font-semibold text-slate-800">{customerName}</p>
