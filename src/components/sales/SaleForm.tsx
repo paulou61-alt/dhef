@@ -35,6 +35,25 @@ const PAYMENT_OPTIONS: SelectOption[] = [
   { value: "parcelado", label: "Parcelado", description: "Pagamento em parcelas" },
 ];
 
+function getDefaultVariantId(products: Product[], variants: Variant[]) {
+  const productsById = new Map(products.map((product) => [product.id, product]));
+
+  const preferredVariant = variants.find((variant) => {
+    if (variant.stock_quantity <= 0) return false;
+
+    const product = productsById.get(variant.product_id);
+    if (!product) return false;
+
+    const productName = product.name.toLocaleLowerCase("pt-BR");
+    const variantName = variant.variant_name.toLocaleLowerCase("pt-BR");
+    const price = Number(variant.sale_price ?? product.sale_price ?? 0);
+
+    return productName.includes("rancho") && variantName.includes("padr") && Math.abs(price - 480) < 0.005;
+  });
+
+  return preferredVariant?.id ?? "";
+}
+
 export function SaleForm({
   customers,
   products,
@@ -52,7 +71,7 @@ export function SaleForm({
   const [installmentsCount, setInstallmentsCount] = useState("2");
   const [firstDueDate, setFirstDueDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState("");
-  const [selectedVariant, setSelectedVariant] = useState("");
+  const [selectedVariant, setSelectedVariant] = useState(() => getDefaultVariantId(products, variants));
   const [items, setItems] = useState<CartItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -142,7 +161,7 @@ export function SaleForm({
     setCustomerId("");
     setDownPayment("");
     setNotes("");
-    setSelectedVariant("");
+    setSelectedVariant(getDefaultVariantId(products, variants));
   }
 
   function submit() {
