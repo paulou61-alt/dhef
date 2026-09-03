@@ -1,8 +1,17 @@
+const runtimeCaching = require("next-pwa/cache");
+
 const withPWA = require("next-pwa")({
   dest: "public",
   register: true,
   skipWaiting: true,
   disable: process.env.NODE_ENV === "development",
+  fallbacks: {
+    document: "/offline",
+  },
+  runtimeCaching,
+  cacheOnFrontEndNav: true,
+  aggressiveFrontEndNavCaching: true,
+  reloadOnOnline: false,
 });
 
 /** @type {import('next').NextConfig} */
