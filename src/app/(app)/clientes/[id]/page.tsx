@@ -30,11 +30,12 @@ export default async function CustomerDetailPage({ params }: { params: { id: str
 
   const { data: sales } = await supabase
     .from("sales")
-    .select("id, sale_number, total, created_at, payment_method, is_paid, status")
+    .select("id, sale_number, total, down_payment, created_at, payment_method, is_paid, status, is_opening_balance")
     .eq("customer_id", params.id)
     .order("created_at", { ascending: false });
 
   const saleIds = (sales ?? []).map((s) => s.id);
+  const saleMap = new Map((sales ?? []).map((sale) => [sale.id, sale]));
 
   const { data: installments } = saleIds.length
     ? await supabase
@@ -44,17 +45,23 @@ export default async function CustomerDetailPage({ params }: { params: { id: str
         .order("due_date", { ascending: true })
     : { data: [] as any[] };
 
-  const totalPurchased = (sales ?? [])
-    .filter((s) => s.status === "completed")
-    .reduce((sum, s) => sum + Number(s.total), 0);
+  const actualSales = (sales ?? []).filter((sale) => !sale.is_opening_balance);
+  const completedPurchases = actualSales.filter((sale) => sale.status === "completed");
+
+  const totalPurchased = completedPurchases.reduce((sum, sale) => sum + Number(sale.total), 0);
 
   const totalOpen = (installments ?? [])
     .filter((i) => i.status !== "pago")
-    .reduce((sum, i) => sum + (Number(i.amount) - Number(i.paid_amount)), 0);
+    .reduce((sum, i) => sum + Math.max(0, Number(i.amount) - Number(i.paid_amount)), 0);
 
-  const totalPaid = totalPurchased - totalOpen;
+  const installmentPaid = (installments ?? []).reduce((sum, installment) => sum + Number(installment.paid_amount), 0);
+  const directPaid = completedPurchases.reduce(
+    (sum, sale) => sum + (sale.is_paid ? Number(sale.total) : Number(sale.down_payment ?? 0)),
+    0,
+  );
+  const totalPaid = directPaid + installmentPaid;
 
-  const pendingInstallments = (installments ?? []).filter((i) => i.status !== "pago");
+  const pendingInstallments = (installments ?? []).filter((i) => i.status !== "pago" && Number(i.amount) - Number(i.paid_amount) > 0);
 
   const whatsappNumber = customer.whatsapp ?? customer.phone;
   const chargeMessage = `Olá ${customer.name}, tudo bem? Você tem ${formatCurrency(
@@ -97,7 +104,7 @@ export default async function CustomerDetailPage({ params }: { params: { id: str
           <CustomerStat label="Total comprado" value={formatCurrency(totalPurchased)} />
           <CustomerStat label="Total pago" value={formatCurrency(totalPaid)} tone="success" />
           <CustomerStat label="Em aberto" value={formatCurrency(totalOpen)} tone={totalOpen > 0 ? "warning" : undefined} />
-          <CustomerStat label="Compras" value={String((sales ?? []).length)} />
+          <CustomerStat label="Compras" value={String(completedPurchases.length)} />
         </div>
 
         {totalOpen > 0 && whatsappNumber && (
@@ -115,37 +122,40 @@ export default async function CustomerDetailPage({ params }: { params: { id: str
 
       {pendingInstallments.length > 0 && (
         <div className="card">
-          <h2 className="mb-3 text-[15px] font-bold text-slate-900">Parcelas em aberto</h2>
+          <h2 className="mb-3 text-[15px] font-bold text-slate-900">Valores em aberto</h2>
           <ul className="divide-y divide-slate-100">
-            {pendingInstallments.map((i) => (
-              <li key={i.id} className="flex items-center justify-between py-2.5">
-                <div>
-                  <p className="text-[13px] font-medium text-slate-700">
-                    Parcela {i.installment_number}/{i.total_installments}
-                  </p>
-                  <p className="text-[12px] text-slate-500">Vence em {formatDate(i.due_date)}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[13px] font-bold text-slate-900">
-                    {formatCurrency(Number(i.amount) - Number(i.paid_amount))}
-                  </span>
-                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_LABELS[i.status]?.className}`}>
-                    {STATUS_LABELS[i.status]?.label}
-                  </span>
-                </div>
-              </li>
-            ))}
+            {pendingInstallments.map((i) => {
+              const sale = saleMap.get(i.sale_id);
+              return (
+                <li key={i.id} className="flex items-center justify-between py-2.5">
+                  <div>
+                    <p className={`text-[13px] font-medium ${sale?.is_opening_balance ? "text-amber-700" : "text-slate-700"}`}>
+                      {sale?.is_opening_balance ? "Saldo devedor inicial" : `Parcela ${i.installment_number}/${i.total_installments}`}
+                    </p>
+                    <p className="text-[12px] text-slate-500">Vence em {formatDate(i.due_date)}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[13px] font-bold text-slate-900">
+                      {formatCurrency(Number(i.amount) - Number(i.paid_amount))}
+                    </span>
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_LABELS[i.status]?.className}`}>
+                      {STATUS_LABELS[i.status]?.label}
+                    </span>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}
 
       <div className="card">
         <h2 className="mb-3 text-[15px] font-bold text-slate-900">Histórico de vendas</h2>
-        {!sales || sales.length === 0 ? (
+        {actualSales.length === 0 ? (
           <p className="text-sm text-slate-500">Nenhuma venda registrada ainda.</p>
         ) : (
           <ul className="divide-y divide-slate-100">
-            {sales.map((s) => (
+            {actualSales.map((s) => (
               <li key={s.id}>
                 <Link href={`/vender/${s.id}`} className="flex items-center justify-between py-2.5">
                   <div>
