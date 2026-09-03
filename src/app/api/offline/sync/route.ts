@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 type IncomingOperation = {
   id: string;
   userId: string;
-  type: "sale" | "payment" | "expense";
+  type: "sale" | "payment" | "payment_purchase" | "expense";
   payload: Record<string, unknown>;
 };
 
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
       continue;
     }
 
-    if (!["sale", "payment", "expense"].includes(operation.type)) {
+    if (!["sale", "payment", "payment_purchase", "expense"].includes(operation.type)) {
       results.push({ id: operation.id, success: false, error: "Tipo de operação inválido." });
       continue;
     }
@@ -54,6 +54,7 @@ export async function POST(request: Request) {
       else if (raw.includes("maior que o saldo")) message = "O pagamento é maior que o saldo atual da parcela.";
       else if (raw.includes("Sessão expirada")) message = "Sessão expirada. Faça login novamente.";
       else if (raw.includes("Entrada")) message = raw;
+      else if (raw.includes("carteira deste cobrador")) message = "Este cliente não pertence mais à carteira deste cobrador.";
       else if (raw.includes("duplicate") || raw.includes("unique")) message = "Existe um conflito com dados criados enquanto o aparelho estava offline.";
       results.push({ id: operation.id, success: false, error: message });
       continue;
