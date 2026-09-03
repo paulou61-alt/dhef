@@ -9,6 +9,7 @@ import { retryFailedOperation, syncAllOfflineOperations } from "@/lib/offline/sy
 const LABELS: Record<OfflineOperation["type"], string> = {
   sale: "Venda",
   payment: "Recebimento",
+  payment_purchase: "Recebimento + compra",
   expense: "Despesa",
 };
 
