@@ -14,6 +14,7 @@ export interface OfflineSubmitResult {
   synced: boolean;
   resultId?: string | null;
   error?: string;
+  needsAttention?: boolean;
 }
 
 type SyncApiResult = {
@@ -62,7 +63,12 @@ async function applySyncResult(operation: OfflineOperation, result: SyncApiResul
     attempts: operation.attempts + 1,
     lastError: result.error ?? "A operação precisa de atenção antes de ser sincronizada.",
   });
-  return { queued: true, synced: false, error: result.error ?? "Não foi possível sincronizar a operação." };
+  return {
+    queued: true,
+    synced: false,
+    needsAttention: true,
+    error: result.error ?? "Não foi possível sincronizar a operação.",
+  };
 }
 
 export async function syncOfflineOperation(id: string): Promise<OfflineSubmitResult> {
@@ -84,7 +90,7 @@ export async function syncOfflineOperation(id: string): Promise<OfflineSubmitRes
   } catch (error) {
     const message = error instanceof Error ? error.message : "Falha de conexão durante a sincronização.";
     await markNetworkRetry(operation, message);
-    return { queued: true, synced: false, error: navigator.onLine ? message : undefined };
+    return { queued: true, synced: false, needsAttention: false, error: navigator.onLine ? message : undefined };
   } finally {
     notifyOfflineChange();
   }
@@ -148,7 +154,16 @@ export async function submitOfflineCapableOperation(
     return { queued: true, synced: false };
   }
 
-  return await syncOfflineOperation(operation.id);
+  const result = await syncOfflineOperation(operation.id);
+
+  // Se o servidor respondeu com um erro de negócio durante a operação que acabou de ser criada
+  // online, mantemos o formulário como antes: não deixamos uma pendência desnecessária na fila.
+  if (result.needsAttention) {
+    await removeOfflineOperation(operation.id);
+    return { ...result, queued: false };
+  }
+
+  return result;
 }
 
 export async function retryFailedOperation(id: string): Promise<OfflineSubmitResult> {
