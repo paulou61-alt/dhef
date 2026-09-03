@@ -8,6 +8,7 @@ import { getMainNav, getSecondaryNav } from "@/lib/nav-items";
 import type { AppRole } from "@/lib/access";
 import type { ViewPermission } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/client";
+import { clearOfflineStorage } from "@/lib/offline/db";
 
 const ROLE_LABELS: Record<AppRole, string> = { owner: "Proprietário", vendedor: "Vendedor", cobrador: "Cobrador" };
 
@@ -19,6 +20,7 @@ export function Sidebar({ role, displayName, viewPermissions = [] }: { role: App
   const secondaryNav = getSecondaryNav(role);
 
   async function handleLogout() {
+    await clearOfflineStorage().catch(() => undefined);
     await supabase.auth.signOut();
     router.push("/login");
     router.refresh();
