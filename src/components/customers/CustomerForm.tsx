@@ -158,6 +158,24 @@ export function CustomerForm({
 
       <section className="card space-y-4">
         <h2 className="text-[14px] font-bold text-slate-900">Outros</h2>
+
+        {!customer && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
+            <label className="label !text-amber-900" htmlFor="opening_balance">Saldo devedor inicial (opcional)</label>
+            <input
+              id="opening_balance"
+              name="opening_balance"
+              className="input-field bg-white"
+              placeholder="0,00"
+              inputMode="numeric"
+              onInput={(e) => { e.currentTarget.value = maskCurrencyInput(e.currentTarget.value); }}
+            />
+            <p className="mt-1.5 text-[11px] leading-relaxed text-amber-800/80">
+              Use se o cliente já possui um valor em aberto antes deste cadastro. O saldo entrará em Receber, Cobranças e no histórico da ficha.
+            </p>
+          </div>
+        )}
+
         <div>
           <label className="label" htmlFor="credit_limit">Limite de crédito (opcional)</label>
           <input id="credit_limit" name="credit_limit" className="input-field" placeholder="0,00" value={creditLimit} onChange={(e) => setCreditLimit(maskCurrencyInput(e.target.value))} inputMode="numeric" />
