@@ -9,6 +9,7 @@ type SaleSummary = {
   id: string;
   customer_id: string | null;
   sale_number: number | string | null;
+  is_opening_balance: boolean;
 };
 
 type CustomerSummary = {
@@ -66,7 +67,7 @@ export default async function ReceberPage({
   const supabase = createClient();
   const [{ data: installments }, { data: sales }, { data: customers }] = await Promise.all([
     supabase.from("installments").select("*").in("status", ["pendente", "parcial", "vencido"]).order("due_date"),
-    supabase.from("sales").select("id, customer_id, sale_number"),
+    supabase.from("sales").select("id, customer_id, sale_number, is_opening_balance"),
     supabase.from("customers").select("id, name, phone, whatsapp, ficha_number"),
   ]);
 
@@ -209,7 +210,7 @@ export default async function ReceberPage({
                         <p className="truncate text-sm font-semibold text-slate-900">{customerName}</p>
                       </div>
                       <p className="mt-1 text-xs text-slate-500">
-                        {debtor.items.length} parcela(s) em aberto
+                        {debtor.items.length} pendência(s) em aberto
                         {debtor.overdue > 0 ? ` · ${debtor.overdue} vencida(s)` : ""}
                       </p>
                     </div>
@@ -249,8 +250,14 @@ export default async function ReceberPage({
                         <div key={item.id} className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 sm:flex-row sm:items-center">
                           <div className="min-w-0 flex-1">
                             <p className="text-sm font-semibold text-slate-800">
-                              Parcela {item.installment_number}/{item.total_installments}
-                              <span className="font-normal text-slate-400"> · Venda #{sale?.sale_number ?? "-"}</span>
+                              {sale?.is_opening_balance ? (
+                                <span className="text-amber-700">Saldo devedor inicial</span>
+                              ) : (
+                                <>
+                                  Parcela {item.installment_number}/{item.total_installments}
+                                  <span className="font-normal text-slate-400"> · Venda #{sale?.sale_number ?? "-"}</span>
+                                </>
+                              )}
                             </p>
                             <p className="mt-1 text-xs text-slate-500">Vencimento: {formatDate(item.due_date)}</p>
                           </div>
