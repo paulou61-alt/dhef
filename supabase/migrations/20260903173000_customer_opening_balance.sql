@@ -1,28 +1,61 @@
-alter table public.customers
-  add column if not exists opening_balance numeric(12,2) not null default 0;
-
-alter table public.customers
-  drop constraint if exists customers_opening_balance_nonnegative;
-
-alter table public.customers
-  add constraint customers_opening_balance_nonnegative
-  check (opening_balance >= 0);
-
 alter table public.sales
   add column if not exists is_opening_balance boolean not null default false;
 
-create or replace function private.create_customer_opening_balance()
-returns trigger
+create index if not exists sales_opening_balance_customer_idx
+  on public.sales (customer_id)
+  where is_opening_balance = true and status <> 'cancelled';
+
+create or replace function public.create_customer_opening_balance(
+  p_customer_id uuid,
+  p_amount numeric,
+  p_due_date date default current_date
+)
+returns uuid
 language plpgsql
 security definer
 set search_path to 'pg_catalog', 'public', 'private'
 as $$
 declare
+  v_owner_id uuid := private.current_owner_id();
+  v_role text := private.current_access_role();
+  v_collaborator_id uuid := private.current_collaborator_id();
+  v_customer public.customers%rowtype;
   v_sale_id uuid;
   v_sale_number bigint;
 begin
-  if coalesce(new.opening_balance, 0) <= 0 then
-    return new;
+  if auth.uid() is null or v_owner_id is null then
+    raise exception 'Usuário não autenticado';
+  end if;
+
+  if v_role not in ('owner', 'vendedor') then
+    raise exception 'Sem permissão para cadastrar saldo devedor inicial';
+  end if;
+
+  if p_amount is null or p_amount <= 0 then
+    raise exception 'Saldo devedor inicial deve ser maior que zero';
+  end if;
+
+  select * into v_customer
+  from public.customers
+  where id = p_customer_id and user_id = v_owner_id;
+
+  if v_customer.id is null then
+    raise exception 'Cliente não encontrado';
+  end if;
+
+  if v_role = 'vendedor' and v_customer.assigned_collaborator_id is distinct from v_collaborator_id then
+    raise exception 'Cliente não pertence a este colaborador';
+  end if;
+
+  if exists (
+    select 1
+    from public.sales
+    where user_id = v_owner_id
+      and customer_id = p_customer_id
+      and is_opening_balance = true
+      and status <> 'cancelled'
+  ) then
+    raise exception 'Este cliente já possui saldo devedor inicial cadastrado';
   end if;
 
   v_sale_number := nextval('public.sale_number_seq');
@@ -41,17 +74,17 @@ begin
     created_by_collaborator_id,
     is_opening_balance
   ) values (
-    new.user_id,
-    new.id,
+    v_owner_id,
+    p_customer_id,
     v_sale_number,
     'completed',
     'fiado',
-    new.opening_balance,
-    new.opening_balance,
+    round(p_amount, 2),
+    round(p_amount, 2),
     0,
     false,
     'Saldo devedor inicial',
-    null,
+    case when v_role = 'vendedor' then v_collaborator_id else null end,
     true
   )
   returning id into v_sale_id;
@@ -66,24 +99,19 @@ begin
     due_date,
     status
   ) values (
-    new.user_id,
+    v_owner_id,
     v_sale_id,
     1,
     1,
-    new.opening_balance,
+    round(p_amount, 2),
     0,
-    current_date,
+    coalesce(p_due_date, current_date),
     'pendente'
   );
 
-  return new;
+  return v_sale_id;
 end;
 $$;
 
-drop trigger if exists trg_create_customer_opening_balance on public.customers;
-
-create trigger trg_create_customer_opening_balance
-after insert on public.customers
-for each row
-when (new.opening_balance > 0)
-execute function private.create_customer_opening_balance();
+revoke all on function public.create_customer_opening_balance(uuid, numeric, date) from public;
+grant execute on function public.create_customer_opening_balance(uuid, numeric, date) to authenticated;
