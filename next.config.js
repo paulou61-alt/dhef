@@ -8,6 +8,12 @@ const withPWA = require("next-pwa")({
   fallbacks: {
     document: "/offline",
   },
+  additionalManifestEntries: [
+    { url: "/offline", revision: "offline-v1" },
+    { url: "/offline/venda", revision: "offline-v1" },
+    { url: "/offline/receber", revision: "offline-v1" },
+    { url: "/offline/despesa", revision: "offline-v1" },
+  ],
   runtimeCaching,
   cacheOnFrontEndNav: true,
   aggressiveFrontEndNavCaching: true,
