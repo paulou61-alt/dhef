@@ -24,6 +24,30 @@ function parseCurrencyField(formData: FormData, key: string): number | null {
   return value;
 }
 
+function parseInitialPurchaseItems(formData: FormData): Array<{ product_variant_id: string; quantity: number }> {
+  const raw = getStringField(formData, "initial_purchase_items");
+  if (!raw) return [];
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error("Revise os produtos da primeira compra.");
+  }
+
+  if (!Array.isArray(parsed)) throw new Error("Revise os produtos da primeira compra.");
+  if (parsed.length > 100) throw new Error("A primeira compra possui itens demais.");
+
+  return parsed.map((item: any) => {
+    const variantId = typeof item?.product_variant_id === "string" ? item.product_variant_id : "";
+    const quantity = Number(item?.quantity);
+    if (!variantId || !Number.isSafeInteger(quantity) || quantity <= 0) {
+      throw new Error("Revise os produtos e quantidades da primeira compra.");
+    }
+    return { product_variant_id: variantId, quantity };
+  });
+}
+
 function buildCustomerPayload(formData: FormData) {
   const name = getStringField(formData, "name");
   if (!name) throw new Error("O nome do cliente é obrigatório.");
@@ -67,6 +91,8 @@ function customerWriteError(error: any, fallback: string) {
   if (message.includes("número da ficha deve ser maior")) return "O número da ficha deve estar entre 1 e 1000.";
   if (message.includes("numeração da ficha não pode ser alterada")) return "O número da ficha não pode ser alterado depois do cadastro.";
   if (message.includes("colaborador responsável inválido")) return "Revise o colaborador responsável.";
+  if (message.includes("estoque insuficiente")) return error.message;
+  if (message.includes("entrada não pode")) return "A entrada da primeira compra não pode ser maior que o valor da compra.";
   return fallback;
 }
 
@@ -77,14 +103,26 @@ export async function createCustomer(formData: FormData): Promise<CustomerFormSt
 
   let payload;
   let openingBalance: number | null;
+  let initialItems: Array<{ product_variant_id: string; quantity: number }>;
+  let initialDownPayment: number | null;
   try {
     payload = buildCustomerPayload(formData);
     openingBalance = parseCurrencyField(formData, "opening_balance");
+    initialItems = parseInitialPurchaseItems(formData);
+    initialDownPayment = parseCurrencyField(formData, "initial_down_payment");
   } catch (e: any) {
     return { error: e.message };
   }
 
   if (access.role === "vendedor") payload.assigned_collaborator_id = access.collaboratorId;
+
+  const initialPaymentMethod = getStringField(formData, "initial_payment_method") ?? "parcelado";
+  const allowedMethods = new Set(["pix", "dinheiro", "cartao", "fiado", "parcelado"]);
+  if (!allowedMethods.has(initialPaymentMethod)) return { error: "Forma de pagamento da primeira compra inválida." };
+
+  const initialInstallments = Math.max(1, Math.min(36, Number(getStringField(formData, "initial_installments_count") ?? "1") || 1));
+  const initialFirstDueDate = getStringField(formData, "initial_first_due_date") ?? new Date().toISOString().slice(0, 10);
+  const initialPurchaseNotes = getStringField(formData, "initial_purchase_notes");
 
   const supabase = createClient();
   const { data, error } = await supabase
@@ -95,16 +133,26 @@ export async function createCustomer(formData: FormData): Promise<CustomerFormSt
 
   if (error) return { error: customerWriteError(error, "Não foi possível salvar o cliente. Tente novamente.") };
 
-  if (openingBalance && openingBalance > 0) {
-    const { error: openingBalanceError } = await supabase.rpc("create_customer_opening_balance", {
+  if ((openingBalance ?? 0) > 0 || initialItems.length > 0) {
+    const { error: initializeError } = await supabase.rpc("initialize_customer_account", {
       p_customer_id: data.id,
-      p_amount: openingBalance,
-      p_due_date: new Date().toISOString().slice(0, 10),
+      p_opening_balance: openingBalance ?? 0,
+      p_items: initialItems,
+      p_payment_method: initialPaymentMethod,
+      p_down_payment: initialDownPayment ?? 0,
+      p_installments_count: initialInstallments,
+      p_first_due_date: initialFirstDueDate,
+      p_notes: initialPurchaseNotes,
     });
 
-    if (openingBalanceError) {
+    if (initializeError) {
       await supabase.from("customers").delete().eq("id", data.id).eq("user_id", access.ownerId);
-      return { error: "Não foi possível registrar o saldo devedor inicial. O cliente não foi salvo; tente novamente." };
+      return {
+        error: customerWriteError(
+          initializeError,
+          "Não foi possível concluir o cadastro com a primeira compra. O cliente não foi salvo; revise os dados e tente novamente."
+        ),
+      };
     }
   }
 
@@ -112,6 +160,7 @@ export async function createCustomer(formData: FormData): Promise<CustomerFormSt
   revalidatePath("/fichas");
   revalidatePath("/receber");
   revalidatePath("/cobrancas");
+  revalidatePath("/vender");
   redirect(`/clientes/${data.id}`);
 }
 
