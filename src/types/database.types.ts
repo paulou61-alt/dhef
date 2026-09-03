@@ -93,6 +93,7 @@ export interface Sale {
   total: number;
   down_payment: number;
   is_paid: boolean;
+  is_opening_balance: boolean;
   notes: string | null;
   created_at: string;
   updated_at: string;
