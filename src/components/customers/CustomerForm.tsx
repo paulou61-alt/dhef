@@ -22,6 +22,23 @@ export interface CustomerCollaboratorOption {
   role: "vendedor" | "cobrador";
 }
 
+function getDefaultInitialPurchase(products: PurchaseProduct[], variants: PurchaseVariant[]): PurchaseItem[] {
+  const productById = new Map(products.map((product) => [product.id, product]));
+  const effectivePrice = (variant: PurchaseVariant) => {
+    const product = productById.get(variant.product_id);
+    return Number(variant.sale_price ?? product?.sale_price ?? 0);
+  };
+
+  const preferred = variants.find((variant) => {
+    const product = productById.get(variant.product_id);
+    return variant.stock_quantity > 0
+      && Math.abs(effectivePrice(variant) - 480) < 0.01
+      && (product?.name ?? "").toLocaleLowerCase("pt-BR").includes("rancho");
+  }) ?? variants.find((variant) => variant.stock_quantity > 0 && Math.abs(effectivePrice(variant) - 480) < 0.01);
+
+  return preferred ? [{ variantId: preferred.id, quantity: 1 }] : [];
+}
+
 export function CustomerForm({
   customer,
   action,
@@ -45,7 +62,7 @@ export function CustomerForm({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [sameAsPhone, setSameAsPhone] = useState(!customer?.whatsapp || customer.whatsapp === customer.phone);
-  const [initialItems, setInitialItems] = useState<PurchaseItem[]>([]);
+  const [initialItems, setInitialItems] = useState<PurchaseItem[]>(() => customer ? [] : getDefaultInitialPurchase(products, variants));
   const [initialPaymentMethod, setInitialPaymentMethod] = useState("parcelado");
   const [initialInstallments, setInitialInstallments] = useState("2");
   const [initialFirstDueDate, setInitialFirstDueDate] = useState(() => new Date().toISOString().slice(0, 10));

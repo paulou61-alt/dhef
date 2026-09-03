@@ -192,6 +192,73 @@ export async function updateCustomer(customerId: string, formData: FormData): Pr
   redirect(`/clientes/${customerId}`);
 }
 
+export async function updateInstallmentDueDate(input: {
+  customerId: string;
+  installmentId: string;
+  dueDate: string;
+}): Promise<{ error?: string; success?: boolean }> {
+  const access = await getAccessContext();
+  if (!access || access.role !== "owner") return { error: "Apenas o proprietário pode alterar datas de cobrança." };
+
+  const customerId = input.customerId?.trim();
+  const installmentId = input.installmentId?.trim();
+  const dueDate = input.dueDate?.trim();
+  if (!customerId || !installmentId) return { error: "Cobrança inválida." };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return { error: "Informe uma data válida." };
+
+  const [year, month, day] = dueDate.split("-").map(Number);
+  const parsedDate = new Date(Date.UTC(year, month - 1, day));
+  if (
+    parsedDate.getUTCFullYear() !== year
+    || parsedDate.getUTCMonth() !== month - 1
+    || parsedDate.getUTCDate() !== day
+  ) {
+    return { error: "Informe uma data válida." };
+  }
+
+  const supabase = createClient();
+  const { data: installment } = await supabase
+    .from("installments")
+    .select("id, sale_id, status, amount, paid_amount")
+    .eq("id", installmentId)
+    .eq("user_id", access.ownerId)
+    .maybeSingle();
+
+  if (!installment) return { error: "Cobrança não encontrada." };
+  if (installment.status === "pago" || Number(installment.paid_amount ?? 0) >= Number(installment.amount ?? 0)) {
+    return { error: "A data de uma parcela já paga não pode ser alterada." };
+  }
+
+  const { data: sale } = await supabase
+    .from("sales")
+    .select("customer_id")
+    .eq("id", installment.sale_id)
+    .eq("user_id", access.ownerId)
+    .maybeSingle();
+
+  if (!sale || sale.customer_id !== customerId) return { error: "Esta cobrança não pertence ao cliente informado." };
+
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+  const paidAmount = Number(installment.paid_amount ?? 0);
+  const nextStatus = dueDate < today ? "vencido" : paidAmount > 0 ? "parcial" : "pendente";
+
+  const { error } = await supabase
+    .from("installments")
+    .update({ due_date: dueDate, status: nextStatus })
+    .eq("id", installmentId)
+    .eq("user_id", access.ownerId);
+
+  if (error) return { error: "Não foi possível alterar a data de cobrança." };
+
+  revalidatePath(`/clientes/${customerId}`);
+  revalidatePath(`/fichas/${customerId}`);
+  revalidatePath("/receber");
+  revalidatePath("/cobrancas");
+  revalidatePath("/fichas");
+  revalidatePath("/clientes");
+  return { success: true };
+}
+
 export async function deleteCustomer(customerId: string): Promise<{ error?: string }> {
   const access = await getAccessContext();
   if (!access || access.role !== "owner") return { error: "Apenas o proprietário pode excluir clientes." };
