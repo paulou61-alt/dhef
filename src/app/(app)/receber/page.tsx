@@ -115,11 +115,12 @@ export default async function ReceberPage({
 
   const rawQuery = searchParams?.q ?? "";
   const query = normalizeSearch(rawQuery);
+  const numericQuery = rawQuery.replace(/\D/g, "");
   const filteredDebtors = query
     ? debtors.filter((debtor) => {
         const ficha = debtor.customer?.ficha_number != null ? String(debtor.customer.ficha_number) : "";
         const name = normalizeSearch(debtor.customer?.name ?? "");
-        return ficha.includes(query.replace(/\D/g, "")) || name.includes(query);
+        return (numericQuery.length > 0 && ficha.includes(numericQuery)) || name.includes(query);
       })
     : debtors;
 
