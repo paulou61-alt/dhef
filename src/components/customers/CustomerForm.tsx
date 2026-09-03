@@ -61,6 +61,7 @@ export function CustomerForm({
               name="ficha_number"
               type="number"
               min="1"
+              max="1000"
               step="1"
               inputMode="numeric"
               required
@@ -70,7 +71,7 @@ export function CustomerForm({
               defaultValue={customer?.ficha_number ?? ""}
             />
             <p className="mt-1 text-[11px] text-slate-400">
-              {customer ? "O número fica travado após o cadastro." : "Você escolhe o número. Não pode repetir uma ficha já existente."}
+              {customer ? "O número fica travado após o cadastro." : "Use uma ficha de #1 a #1000. A numeração pode se repetir em colaboradores diferentes."}
             </p>
           </div>
 
@@ -112,13 +113,13 @@ export function CustomerForm({
                 </option>
               ))}
             </select>
-            <p className="mt-1 text-[11px] text-slate-400">Essa categoria será usada para organizar a área de Fichas.</p>
+            <p className="mt-1 text-[11px] text-slate-400">Cada colaborador possui sua própria sequência de fichas #1 a #1000.</p>
           </div>
         )}
 
         {accessRole === "vendedor" && collaborators[0] && (
           <div className="rounded-xl bg-brand-50 px-3 py-2 text-sm text-brand-700">
-            Este cliente será vinculado a <strong>{collaborators[0].name}</strong>.
+            Este cliente será vinculado a <strong>{collaborators[0].name}</strong>. As fichas deste colaborador vão de #1 a #1000.
           </div>
         )}
       </section>
