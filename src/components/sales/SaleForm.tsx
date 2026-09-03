@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
-import { createSale } from "@/app/(app)/vender/actions";
+import { CloudOff, Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
 import { SelectField, type SelectOption } from "@/components/ui/SelectField";
+import { setCachedValue } from "@/lib/offline/db";
+import { submitOfflineCapableOperation } from "@/lib/offline/sync";
 import { formatCurrency } from "@/utils/format";
 
 type Customer = { id: string; name: string };
@@ -18,6 +19,13 @@ type Variant = {
 };
 
 type CartItem = { variantId: string; quantity: number };
+
+export type OfflineSaleReference = {
+  customers: Customer[];
+  products: Product[];
+  variants: Variant[];
+  cachedAt: string;
+};
 
 const PAYMENT_OPTIONS: SelectOption[] = [
   { value: "pix", label: "Pix", description: "Pagamento imediato" },
@@ -47,6 +55,17 @@ export function SaleForm({
   const [selectedVariant, setSelectedVariant] = useState("");
   const [items, setItems] = useState<CartItem[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!customers.length && !products.length && !variants.length) return;
+    void setCachedValue<OfflineSaleReference>("sale:reference", {
+      customers,
+      products,
+      variants,
+      cachedAt: new Date().toISOString(),
+    }).catch(() => undefined);
+  }, [customers, products, variants]);
 
   const productById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
   const variantById = useMemo(() => new Map(variants.map((v) => [v.id, v])), [variants]);
@@ -118,24 +137,51 @@ export function SaleForm({
     );
   }
 
+  function resetForm() {
+    setItems([]);
+    setCustomerId("");
+    setDownPayment("");
+    setNotes("");
+    setSelectedVariant("");
+  }
+
   function submit() {
     setError(null);
+    setNotice(null);
     startTransition(async () => {
-      const result = await createSale({
+      const input = {
         customerId: customerId || null,
         items: items.map((item) => ({ product_variant_id: item.variantId, quantity: item.quantity })),
-        paymentMethod: paymentMethod as any,
+        paymentMethod,
         downPayment: Number(downPayment.replace(",", ".")) || 0,
         installmentsCount: Number(installmentsCount) || 1,
         firstDueDate,
         notes,
-      });
-      if (result.error) {
-        setError(result.error);
-        return;
+      };
+
+      try {
+        const result = await submitOfflineCapableOperation("sale", input);
+
+        if (result.synced && result.resultId) {
+          router.push(`/vender/${result.resultId}`);
+          router.refresh();
+          return;
+        }
+
+        if (result.queued) {
+          resetForm();
+          setNotice(
+            result.error
+              ? `Venda salva no aparelho, mas a sincronização precisa de atenção: ${result.error}`
+              : "Venda salva no aparelho. Ela será sincronizada automaticamente quando a internet voltar."
+          );
+          return;
+        }
+
+        setError(result.error ?? "Não foi possível concluir a venda.");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Não foi possível salvar a venda offline.");
       }
-      router.push(`/vender/${result.id}`);
-      router.refresh();
     });
   }
 
@@ -251,9 +297,10 @@ export function SaleForm({
             <span className="text-sm text-slate-500">Total da venda</span>
             <span className="text-2xl font-bold text-slate-900">{formatCurrency(total)}</span>
           </div>
+          {notice && <p className="mt-3 flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800"><CloudOff size={16} className="mt-0.5 flex-none" />{notice}</p>}
           {error && <p className="mt-3 rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
           <button type="button" onClick={submit} disabled={isPending || items.length === 0 || (needsCustomer && !customerId)} className="btn-primary mt-4 w-full">
-            {isPending ? "Finalizando..." : "Concluir venda"}
+            {isPending ? "Salvando..." : "Concluir venda"}
           </button>
         </div>
       </div>
