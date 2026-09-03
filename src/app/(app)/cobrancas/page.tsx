@@ -23,7 +23,14 @@ export default async function CobrancasPage({
 
   const activeFilter = searchParams.status === "pagos" ? "pagos" : "devedores";
   const supabase = createClient();
-  const [{ data: installments }, { data: sales }, { data: customers }, { data: collaborators }] = await Promise.all([
+  const [
+    { data: installments },
+    { data: sales },
+    { data: customers },
+    { data: collaborators },
+    { data: products },
+    { data: variants },
+  ] = await Promise.all([
     supabase.from("installments").select("*").order("due_date"),
     supabase.from("sales").select("id, customer_id, sale_number, is_opening_balance").neq("status", "cancelled"),
     supabase
@@ -31,6 +38,8 @@ export default async function CobrancasPage({
       .select("id, ficha_number, name, phone, whatsapp, address, neighborhood, city, state, zip_code, assigned_collaborator_id")
       .order("ficha_number"),
     supabase.from("collaborators").select("id, name, role, is_active").eq("is_active", true).order("name"),
+    supabase.from("products").select("id, name, sale_price").eq("is_active", true).order("name"),
+    supabase.from("product_variants").select("id, product_id, variant_name, stock_quantity, sale_price").order("variant_name"),
   ]);
 
   const activeCollaborators = collaborators ?? [];
@@ -213,6 +222,8 @@ export default async function CobrancasPage({
                         installmentId={item.id}
                         openAmount={open}
                         buttonLabel={item.isOpeningBalance ? "Receber saldo" : `Pagar ${item.installment_number}/${item.total_installments}`}
+                        products={(products ?? []) as any}
+                        variants={(variants ?? []) as any}
                       />
                     </div>
                   );
