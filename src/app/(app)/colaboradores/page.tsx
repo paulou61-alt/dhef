@@ -25,7 +25,7 @@ export default async function ColaboradoresPage() {
   if (access.role !== "owner") redirect("/login");
 
   const supabase = createClient();
-  const [collaboratorsResult, salesResult, paymentsResult, valesResult] = await Promise.all([
+  const [collaboratorsResult, customersResult, salesResult, paymentsResult, valesResult] = await Promise.all([
     supabase
       .from("collaborators")
       .select("id, name, phone, role, is_active, auth_user_id, accepted_at, view_permissions")
@@ -33,8 +33,12 @@ export default async function ColaboradoresPage() {
       .eq("is_active", true)
       .order("name"),
     supabase
+      .from("customers")
+      .select("id, assigned_collaborator_id")
+      .eq("user_id", access.ownerId),
+    supabase
       .from("sales")
-      .select("created_by_collaborator_id, total, status")
+      .select("created_by_collaborator_id, customer_id, total, status")
       .eq("user_id", access.ownerId),
     supabase
       .from("payments")
@@ -49,17 +53,33 @@ export default async function ColaboradoresPage() {
   ]);
 
   const collaborators = collaboratorsResult.data ?? [];
+  const customers = customersResult.data ?? [];
   const sales = salesResult.data ?? [];
   const payments = paymentsResult.data ?? [];
   const valeMovements = (valesResult.data ?? []) as ValeMovement[];
 
+  const customerCollaborators = new Map<string, string>();
+  for (const customer of customers) {
+    if (customer.assigned_collaborator_id) {
+      customerCollaborators.set(customer.id, customer.assigned_collaborator_id);
+    }
+  }
+
   const salesTotals = new Map<string, { total: number; count: number }>();
   for (const sale of sales) {
-    if (!sale.created_by_collaborator_id || sale.status === "cancelled") continue;
-    const current = salesTotals.get(sale.created_by_collaborator_id) ?? { total: 0, count: 0 };
+    if (sale.status === "cancelled") continue;
+
+    // Se a venda foi feita diretamente por um colaborador, ele é o responsável.
+    // Quando o proprietário lança a venda, usamos o colaborador responsável pela ficha do cliente.
+    const collaboratorId = sale.created_by_collaborator_id
+      ?? (sale.customer_id ? customerCollaborators.get(sale.customer_id) : null);
+
+    if (!collaboratorId) continue;
+
+    const current = salesTotals.get(collaboratorId) ?? { total: 0, count: 0 };
     current.total += Number(sale.total ?? 0);
     current.count += 1;
-    salesTotals.set(sale.created_by_collaborator_id, current);
+    salesTotals.set(collaboratorId, current);
   }
 
   const collectionTotals = new Map<string, number>();
