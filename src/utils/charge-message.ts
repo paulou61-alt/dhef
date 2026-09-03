@@ -7,6 +7,7 @@ export interface ChargeInstallment {
   dueDate: string;
   openAmount: number;
   status?: string;
+  isOpeningBalance?: boolean;
 }
 
 export function buildChargeMessage(customerName: string, installments: ChargeInstallment[]): string {
@@ -20,13 +21,16 @@ export function buildChargeMessage(customerName: string, installments: ChargeIns
   const today = new Date().toISOString().slice(0, 10);
   const lines = open.map((item) => {
     const overdue = item.status === "vencido" || item.dueDate < today;
-    const situation = overdue ? `vencida em ${formatDate(item.dueDate)}` : `vence em ${formatDate(item.dueDate)}`;
-    return `• Parcela ${item.installmentNumber}/${item.totalInstallments} da venda #${item.saleNumber} — ${formatCurrency(item.openAmount)} — ${situation}`;
+    const situation = overdue ? `vencido em ${formatDate(item.dueDate)}` : `vence em ${formatDate(item.dueDate)}`;
+    const reference = item.isOpeningBalance
+      ? "Saldo devedor inicial"
+      : `Parcela ${item.installmentNumber}/${item.totalInstallments} da venda #${item.saleNumber}`;
+    return `• ${reference} — ${formatCurrency(item.openAmount)} — ${situation}`;
   });
 
   if (open.length === 1) {
-    return `Olá ${customerName}, tudo bem? Estou entrando em contato sobre a parcela pendente da sua compra:\n\n${lines[0]}\n\nQuando puder, me confirme sobre o pagamento. Obrigado!`;
+    return `Olá ${customerName}, tudo bem? Estou entrando em contato sobre um valor pendente da sua ficha:\n\n${lines[0]}\n\nQuando puder, me confirme sobre o pagamento. Obrigado!`;
   }
 
-  return `Olá ${customerName}, tudo bem? Estou entrando em contato sobre as parcelas pendentes das suas compras:\n\n${lines.join("\n")}\n\nTotal pendente: ${formatCurrency(total)}.\n\nQuando puder, me confirme sobre o pagamento. Obrigado!`;
+  return `Olá ${customerName}, tudo bem? Estou entrando em contato sobre os valores pendentes da sua ficha:\n\n${lines.join("\n")}\n\nTotal pendente: ${formatCurrency(total)}.\n\nQuando puder, me confirme sobre o pagamento. Obrigado!`;
 }
