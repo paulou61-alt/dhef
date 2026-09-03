@@ -8,6 +8,7 @@ import { getMainNav, getSecondaryNav } from "@/lib/nav-items";
 import type { AppRole } from "@/lib/access";
 import type { ViewPermission } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/client";
+import { clearOfflineStorage, listOfflineOperations } from "@/lib/offline/db";
 
 const ROLE_LABELS: Record<AppRole, string> = { owner: "Proprietário", vendedor: "Vendedor", cobrador: "Cobrador" };
 
@@ -19,6 +20,15 @@ export function Sidebar({ role, displayName, viewPermissions = [] }: { role: App
   const secondaryNav = getSecondaryNav(role);
 
   async function handleLogout() {
+    const operations = await listOfflineOperations().catch(() => []);
+    if (operations.length > 0) {
+      window.alert(
+        `Existem ${operations.length} alteração${operations.length === 1 ? "" : "ões"} ainda não sincronizada${operations.length === 1 ? "" : "s"}. Conecte-se à internet e aguarde a sincronização antes de sair da conta para não perder esses dados.`
+      );
+      return;
+    }
+
+    await clearOfflineStorage().catch(() => undefined);
     await supabase.auth.signOut();
     router.push("/login");
     router.refresh();

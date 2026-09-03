@@ -1,8 +1,21 @@
+const runtimeCaching = require("next-pwa/cache");
+
 const withPWA = require("next-pwa")({
   dest: "public",
   register: true,
   skipWaiting: true,
   disable: process.env.NODE_ENV === "development",
+  fallbacks: {
+    document: "/offline",
+  },
+  additionalManifestEntries: [
+    { url: "/offline/venda", revision: "offline-v1" },
+    { url: "/offline/receber", revision: "offline-v1" },
+    { url: "/offline/despesa", revision: "offline-v1" },
+  ],
+  runtimeCaching,
+  cacheOnFrontEndNav: true,
+  reloadOnOnline: false,
 });
 
 /** @type {import('next').NextConfig} */

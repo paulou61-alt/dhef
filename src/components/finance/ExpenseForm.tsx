@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { registerExpense } from "@/app/(app)/despesas/actions";
+import { CloudOff } from "lucide-react";
+import { submitOfflineCapableOperation } from "@/lib/offline/sync";
 
 export function ExpenseForm() {
   const [description, setDescription] = useState("");
@@ -10,21 +11,46 @@ export function ExpenseForm() {
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  function resetForm() {
+    setDescription("");
+    setAmount("");
+    setNotes("");
+  }
 
   function submit() {
     setError(null);
+    setNotice(null);
     startTransition(async () => {
-      const result = await registerExpense({
-        description,
-        category,
-        amount: Number(amount.replace(",", ".")),
-        expenseDate: date,
-        notes,
-      });
-      if (result.error) return setError(result.error);
-      setDescription(""); setAmount(""); setNotes("");
-      window.location.reload();
+      try {
+        const result = await submitOfflineCapableOperation("expense", {
+          description,
+          category,
+          amount: Number(amount.replace(",", ".")),
+          expenseDate: date,
+          notes,
+        });
+
+        if (result.synced) {
+          resetForm();
+          window.location.reload();
+          return;
+        }
+
+        if (result.queued) {
+          resetForm();
+          setNotice(result.error
+            ? `Despesa salva no aparelho, mas precisa de atenção: ${result.error}`
+            : "Despesa salva offline. Será sincronizada automaticamente quando a internet voltar.");
+          return;
+        }
+
+        setError(result.error ?? "Não foi possível lançar a despesa.");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Não foi possível salvar a despesa offline.");
+      }
     });
   }
 
@@ -38,8 +64,9 @@ export function ExpenseForm() {
       </div>
       <div><label className="label">Data</label><input className="input-field" type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
       <div><label className="label">Observações</label><textarea className="input-field min-h-20" value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
+      {notice && <p className="flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800"><CloudOff size={16} className="mt-0.5 flex-none" />{notice}</p>}
       {error && <p className="rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
-      <button type="button" className="btn-primary w-full" disabled={pending} onClick={submit}>{pending ? "Salvando..." : "Lançar despesa"}</button>
+      <button type="button" className="btn-primary w-full" disabled={pending || !description.trim() || !amount} onClick={submit}>{pending ? "Salvando..." : "Lançar despesa"}</button>
     </div>
   );
 }
