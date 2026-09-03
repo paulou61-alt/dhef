@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CheckCircle2, CloudOff, RefreshCw, Trash2, TriangleAlert } from "lucide-react";
+import { ArrowLeft, CheckCircle2, CloudOff, CreditCard, ReceiptText, RefreshCw, ShoppingCart, Trash2, TriangleAlert } from "lucide-react";
 import { listOfflineOperations, removeOfflineOperation, type OfflineOperation } from "@/lib/offline/db";
 import { retryFailedOperation, syncAllOfflineOperations } from "@/lib/offline/sync";
 
@@ -101,6 +101,15 @@ export default function OfflinePage() {
               <RefreshCw size={16} className={syncing ? "animate-spin" : ""} />
               {syncing ? "Sincronizando" : "Sincronizar agora"}
             </button>
+          </div>
+        </section>
+
+        <section>
+          <p className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-400">Trabalhar sem internet</p>
+          <div className="grid grid-cols-3 gap-2">
+            <Link href="/offline/venda" className="rounded-2xl border border-slate-200 bg-white p-3 text-center shadow-sm"><ShoppingCart size={19} className="mx-auto text-brand-600" /><span className="mt-2 block text-xs font-bold">Nova venda</span></Link>
+            <Link href="/offline/receber" className="rounded-2xl border border-slate-200 bg-white p-3 text-center shadow-sm"><CreditCard size={19} className="mx-auto text-emerald-600" /><span className="mt-2 block text-xs font-bold">Receber</span></Link>
+            <Link href="/offline/despesa" className="rounded-2xl border border-slate-200 bg-white p-3 text-center shadow-sm"><ReceiptText size={19} className="mx-auto text-rose-600" /><span className="mt-2 block text-xs font-bold">Despesa</span></Link>
           </div>
         </section>
 
