@@ -3,10 +3,12 @@ import { notFound } from "next/navigation";
 import { ChevronLeft, MessageCircle, Pencil, MapPin, Plus, CheckCircle2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { CustomerStat } from "@/components/customers/CustomerStat";
+import { InstallmentDueDateEditor } from "@/components/customers/InstallmentDueDateEditor";
 import { DeleteButton } from "@/components/ui/DeleteButton";
 import { formatCurrency, formatDate } from "@/utils/format";
 import { whatsappLink } from "@/utils/masks";
 import { deleteCustomer } from "@/app/(app)/clientes/actions";
+import { getAccessContext } from "@/lib/access";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +20,8 @@ const STATUS_LABELS: Record<string, { label: string; className: string }> = {
 };
 
 export default async function CustomerDetailPage({ params, searchParams }: { params: { id: string }; searchParams?: { created?: string } }) {
+  const access = await getAccessContext();
+  const canEditDueDates = access?.role === "owner";
   const supabase = createClient();
 
   const { data: customer } = await supabase
@@ -153,7 +157,11 @@ export default async function CustomerDetailPage({ params, searchParams }: { par
                     <p className={`text-[13px] font-medium ${sale?.is_opening_balance ? "text-amber-700" : "text-slate-700"}`}>
                       {sale?.is_opening_balance ? "Saldo devedor inicial" : `Parcela ${i.installment_number}/${i.total_installments}`}
                     </p>
-                    <p className="text-[12px] text-slate-500">Vence em {formatDate(i.due_date)}</p>
+                    {canEditDueDates ? (
+                      <InstallmentDueDateEditor customerId={customer.id} installmentId={i.id} dueDate={i.due_date} />
+                    ) : (
+                      <p className="text-[12px] text-slate-500">Vence em {formatDate(i.due_date)}</p>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-[13px] font-bold text-slate-900">
