@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Banknote, CalendarDays, Check, Eye, HandCoins, Minus, Phone, Plus, ReceiptText, ShoppingBag, X } from "lucide-react";
-import { addCollaboratorValeMovement, updateCollaboratorPermissions } from "@/app/(app)/colaboradores/actions";
+import { Banknote, CalendarDays, Check, Eye, HandCoins, Minus, Phone, Plus, ReceiptText, ShoppingBag, X, PencilLine, Save } from "lucide-react";
+import { addCollaboratorValeMovement, setCollaboratorValeBalance, updateCollaboratorPermissions } from "@/app/(app)/colaboradores/actions";
 import { RemoveCollaboratorButton } from "@/components/collaborators/RemoveCollaboratorButton";
 import { getAllowedViewPermissions, VIEW_PERMISSION_LABELS, type ViewPermission } from "@/lib/permissions";
 import { formatCurrency, formatDate } from "@/utils/format";
@@ -31,6 +31,8 @@ export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissio
   const [amount, setAmount] = useState("");
   const [notes, setNotes] = useState("");
   const [movementDate, setMovementDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [editingValeBalance, setEditingValeBalance] = useState(false);
+  const [valeBalanceInput, setValeBalanceInput] = useState(() => valeBalance.toFixed(2));
   const [permissions, setPermissions] = useState<ViewPermission[]>(viewPermissions);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -40,6 +42,7 @@ export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissio
   const permissionsChanged = JSON.stringify([...permissions].sort()) !== JSON.stringify([...viewPermissions].sort());
 
   useEffect(() => { setPermissions(viewPermissions); }, [viewPermissions]);
+  useEffect(() => { if (!editingValeBalance) setValeBalanceInput(valeBalance.toFixed(2)); }, [valeBalance, editingValeBalance]);
   useEffect(() => {
     if (!open) return;
     const old = document.body.style.overflow;
@@ -81,6 +84,19 @@ export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissio
     });
   }
 
+  function saveValeBalance() {
+    const parsed = Number(valeBalanceInput.replace(",", "."));
+    if (!Number.isFinite(parsed) || parsed < 0) return setError("Informe um saldo válido, igual ou maior que zero.");
+    setError(null); setSuccess(null);
+    startTransition(async () => {
+      const result = await setCollaboratorValeBalance({ collaboratorId: collaborator.id, balance: parsed });
+      if (result.error) return setError(result.error);
+      setEditingValeBalance(false);
+      setSuccess("Saldo em vale atualizado e registrado no histórico.");
+      router.refresh();
+    });
+  }
+
   return <>
     <div className="flex flex-wrap items-center gap-3 px-4 py-3.5 transition hover:bg-slate-50/80">
       <button type="button" onClick={() => setOpen(true)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
@@ -114,7 +130,31 @@ export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissio
         <div className="space-y-5 p-5">
           <div className="grid grid-cols-2 gap-3">
             <Metric icon={<ShoppingBag size={15} />} label="Saldo de vendas" value={formatCurrency(salesTotal)} helper={`${salesCount} venda(s)`} />
-            <Metric icon={<HandCoins size={15} />} label="Saldo em vale" value={formatCurrency(valeBalance)} helper="Valor em aberto" warning={valeBalance > 0} />
+            <div className={`rounded-2xl border p-3.5 ${valeBalance > 0 ? "border-amber-200 bg-amber-50" : "border-slate-100 bg-slate-50"}`}>
+              <div className={`flex items-center justify-between gap-2 text-xs font-semibold ${valeBalance > 0 ? "text-amber-700" : "text-slate-500"}`}>
+                <span className="flex items-center gap-2"><HandCoins size={15} />Saldo em vale</span>
+                {!editingValeBalance && <button type="button" onClick={() => { setEditingValeBalance(true); setError(null); setSuccess(null); }} className="rounded-lg p-1 hover:bg-white/70" aria-label="Editar saldo em vale"><PencilLine size={14} /></button>}
+              </div>
+              {editingValeBalance ? (
+                <div className="mt-2 space-y-2">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={valeBalanceInput}
+                    onChange={(e) => setValeBalanceInput(e.target.value)}
+                    className="input-field !h-10 bg-white text-sm font-bold"
+                    autoFocus
+                  />
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => { setEditingValeBalance(false); setValeBalanceInput(valeBalance.toFixed(2)); }} className="flex-1 rounded-lg border border-slate-200 px-2 py-1.5 text-[11px] font-semibold text-slate-600">Cancelar</button>
+                    <button type="button" onClick={saveValeBalance} disabled={pending} className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-brand-600 px-2 py-1.5 text-[11px] font-semibold text-white disabled:opacity-50"><Save size={12} />Salvar</button>
+                  </div>
+                </div>
+              ) : (
+                <><p className={`mt-2 text-lg font-bold ${valeBalance > 0 ? "text-amber-800" : "text-slate-900"}`}>{formatCurrency(valeBalance)}</p><p className="mt-0.5 text-[11px] text-slate-500">Toque no lápis para editar</p></>
+              )}
+            </div>
             <Metric icon={<ReceiptText size={15} />} label="Recebido em cobranças" value={formatCurrency(collectionsTotal)} />
             <Metric icon={<Banknote size={15} />} label="Movimentações de vale" value={String(valeMovements.length)} />
           </div>
