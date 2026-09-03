@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { CheckCircle2, CloudOff, RefreshCw, TriangleAlert } from "lucide-react";
+import { refreshOfflineBootstrap } from "@/lib/offline/bootstrap";
 import { listOfflineOperations, setOfflineIdentity } from "@/lib/offline/db";
 import { syncAllOfflineOperations } from "@/lib/offline/sync";
 
@@ -28,6 +29,7 @@ export function OfflineStatus({ userId }: { userId: string }) {
     setSyncing(true);
     try {
       await syncAllOfflineOperations();
+      await refreshOfflineBootstrap().catch(() => null);
       await refresh();
     } finally {
       setSyncing(false);
@@ -36,7 +38,10 @@ export function OfflineStatus({ userId }: { userId: string }) {
 
   useEffect(() => {
     setOnline(navigator.onLine);
-    void setOfflineIdentity(userId).then(refresh);
+    void setOfflineIdentity(userId).then(async () => {
+      await refresh();
+      if (navigator.onLine) await refreshOfflineBootstrap().catch(() => null);
+    });
 
     if (navigator.storage?.persist) {
       void navigator.storage.persist().catch(() => false);
