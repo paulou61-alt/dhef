@@ -21,7 +21,7 @@ export default async function CobrancasPage({ searchParams }: { searchParams: { 
   const supabase = createClient();
   const [{ data: installments }, { data: sales }, { data: customers }] = await Promise.all([
     supabase.from("installments").select("*").order("due_date"),
-    supabase.from("sales").select("id, customer_id, sale_number").neq("status", "cancelled"),
+    supabase.from("sales").select("id, customer_id, sale_number, is_opening_balance").neq("status", "cancelled"),
     supabase.from("customers").select("id, name, phone, whatsapp, address, neighborhood, city, state, zip_code").order("name"),
   ]);
 
@@ -35,7 +35,11 @@ export default async function CobrancasPage({ searchParams }: { searchParams: { 
     const customer = customerMap.get(sale.customer_id);
     if (!customer) return;
     const current = grouped.get(customer.id) ?? { customer, items: [] };
-    current.items.push({ ...installment, saleNumber: sale.sale_number });
+    current.items.push({
+      ...installment,
+      saleNumber: sale.sale_number,
+      isOpeningBalance: Boolean(sale.is_opening_balance),
+    });
     grouped.set(customer.id, current);
   });
 
@@ -76,7 +80,15 @@ export default async function CobrancasPage({ searchParams }: { searchParams: { 
           const phone = customer.whatsapp ?? customer.phone;
           const addressParts = [customer.address, customer.neighborhood, customer.city, customer.state, customer.zip_code].filter(Boolean);
           const fullAddress = addressParts.join(", ");
-          const chargeItems: ChargeInstallment[] = openItems.map((item) => ({ installmentNumber: item.installment_number, totalInstallments: item.total_installments, saleNumber: item.saleNumber, dueDate: item.due_date, openAmount: Number(item.amount) - Number(item.paid_amount), status: item.status }));
+          const chargeItems: ChargeInstallment[] = openItems.map((item) => ({
+            installmentNumber: item.installment_number,
+            totalInstallments: item.total_installments,
+            saleNumber: item.saleNumber,
+            dueDate: item.due_date,
+            openAmount: Number(item.amount) - Number(item.paid_amount),
+            status: item.status,
+            isOpeningBalance: item.isOpeningBalance,
+          }));
           const message = buildChargeMessage(customer.name, chargeItems);
           const mapsUrl = fullAddress ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}` : null;
 
@@ -95,12 +107,14 @@ export default async function CobrancasPage({ searchParams }: { searchParams: { 
                   return (
                     <div key={item.id} className="flex flex-wrap items-center gap-3 rounded-xl bg-surface-muted p-3">
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-slate-800">Parcela {item.installment_number}/{item.total_installments} · Venda #{item.saleNumber}</p>
+                        <p className={`text-sm font-semibold ${item.isOpeningBalance ? "text-amber-700" : "text-slate-800"}`}>
+                          {item.isOpeningBalance ? "Saldo devedor inicial" : `Parcela ${item.installment_number}/${item.total_installments} · Venda #${item.saleNumber}`}
+                        </p>
                         <p className={`text-xs ${overdue ? "text-danger" : "text-slate-500"}`}>{overdue ? "Vencida" : "Vence"} em {formatDate(item.due_date)}</p>
                         {paid > 0 && <p className="mt-1 text-xs font-semibold text-success">Já pago: {formatCurrency(paid)}</p>}
                       </div>
                       <div className="text-right"><p className="text-[10px] uppercase tracking-wide text-slate-400">Falta</p><p className="text-sm font-bold text-slate-900">{formatCurrency(open)}</p></div>
-                      <ReceiveButton installmentId={item.id} openAmount={open} buttonLabel={`Pagar ${item.installment_number}/${item.total_installments}`} />
+                      <ReceiveButton installmentId={item.id} openAmount={open} buttonLabel={item.isOpeningBalance ? "Receber saldo" : `Pagar ${item.installment_number}/${item.total_installments}`} />
                     </div>
                   );
                 })}
@@ -122,7 +136,7 @@ export default async function CobrancasPage({ searchParams }: { searchParams: { 
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2"><h2 className="truncate text-base font-bold text-success">{customer.name}</h2><span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-1 text-[10px] font-bold text-success"><CheckCircle2 size={11} /> Quitado</span></div>
-                <p className="mt-1 text-xs text-slate-500">Todas as parcelas registradas estão pagas.</p>
+                <p className="mt-1 text-xs text-slate-500">Todas as pendências registradas estão pagas.</p>
               </div>
               <div className="text-right"><p className="text-xs text-slate-500">Total pago</p><p className="text-lg font-bold text-success">{formatCurrency(paidTotal)}</p></div>
             </div>
@@ -130,7 +144,12 @@ export default async function CobrancasPage({ searchParams }: { searchParams: { 
             <div className="mt-4 space-y-2">
               {items.map((item) => (
                 <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl bg-white/80 p-3">
-                  <div className="min-w-0"><p className="text-sm font-semibold text-slate-800">Parcela {item.installment_number}/{item.total_installments} · Venda #{item.saleNumber}</p><p className="text-xs text-slate-500">Vencimento {formatDate(item.due_date)}</p></div>
+                  <div className="min-w-0">
+                    <p className={`text-sm font-semibold ${item.isOpeningBalance ? "text-amber-700" : "text-slate-800"}`}>
+                      {item.isOpeningBalance ? "Saldo devedor inicial" : `Parcela ${item.installment_number}/${item.total_installments} · Venda #${item.saleNumber}`}
+                    </p>
+                    <p className="text-xs text-slate-500">Vencimento {formatDate(item.due_date)}</p>
+                  </div>
                   <div className="flex flex-shrink-0 items-center gap-2 font-bold text-success"><CheckCircle2 size={16} /><span className="text-sm">{formatCurrency(Number(item.paid_amount))}</span></div>
                 </div>
               ))}
