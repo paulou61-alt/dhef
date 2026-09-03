@@ -64,11 +64,12 @@ export default async function DashboardPage() {
     { data: monthExpenses },
     { data: monthPayments },
   ] = await Promise.all([
-    supabase.from("sales").select("total").eq("status", "completed").gte("created_at", today),
+    supabase.from("sales").select("total").eq("status", "completed").eq("is_opening_balance", false).gte("created_at", today),
     supabase
       .from("sales")
       .select("id, total, sale_items(quantity, unit_cost_snapshot, unit_price_snapshot)")
       .eq("status", "completed")
+      .eq("is_opening_balance", false)
       .gte("created_at", monthStart),
     supabase
       .from("installments")
@@ -93,6 +94,7 @@ export default async function DashboardPage() {
       .from("sales")
       .select("id, total, created_at, sale_number, customers(name)")
       .eq("status", "completed")
+      .eq("is_opening_balance", false)
       .order("created_at", { ascending: false })
       .limit(6),
     supabase
