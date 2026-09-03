@@ -207,3 +207,61 @@ export async function addCollaboratorValeMovement(
   revalidatePath("/colaboradores");
   return { success: true };
 }
+
+export async function setCollaboratorValeBalance(input: {
+  collaboratorId: string;
+  balance: number;
+}): Promise<{ error?: string; success?: boolean }> {
+  const access = await getAccessContext();
+  if (!access || access.role !== "owner") return { error: "Apenas o proprietário pode editar o saldo em vale." };
+
+  const collaboratorId = input.collaboratorId?.trim();
+  const targetBalance = Number(input.balance);
+  if (!collaboratorId) return { error: "Colaborador inválido." };
+  if (!Number.isFinite(targetBalance) || targetBalance < 0) return { error: "Informe um saldo válido, igual ou maior que zero." };
+
+  const supabase = createClient();
+  const { data: collaborator } = await supabase
+    .from("collaborators")
+    .select("id")
+    .eq("id", collaboratorId)
+    .eq("owner_id", access.ownerId)
+    .maybeSingle();
+
+  if (!collaborator) return { error: "Colaborador não encontrado." };
+
+  const { data: movements, error: movementsError } = await supabase
+    .from("collaborator_vale_movements")
+    .select("movement_type, amount")
+    .eq("owner_id", access.ownerId)
+    .eq("collaborator_id", collaboratorId);
+
+  if (movementsError) return { error: "Não foi possível consultar o saldo atual." };
+
+  const currentBalance = (movements ?? []).reduce((sum, movement) => {
+    const amount = Number(movement.amount ?? 0);
+    return sum + (movement.movement_type === "vale" ? amount : -amount);
+  }, 0);
+
+  const normalizedTarget = Number(targetBalance.toFixed(2));
+  const difference = Number((normalizedTarget - currentBalance).toFixed(2));
+  if (Math.abs(difference) < 0.01) return { success: true };
+
+  const { error } = await supabase.from("collaborator_vale_movements").insert({
+    owner_id: access.ownerId,
+    collaborator_id: collaboratorId,
+    movement_type: difference > 0 ? "vale" : "abatimento",
+    amount: Math.abs(difference),
+    movement_date: new Date().toISOString().slice(0, 10),
+    notes: "Ajuste manual de saldo",
+  });
+
+  if (error) {
+    if (error.message.toLowerCase().includes("abatimento não pode")) return { error: "O novo saldo não pode gerar um abatimento maior que o saldo atual." };
+    return { error: "Não foi possível atualizar o saldo em vale." };
+  }
+
+  revalidatePath("/colaboradores");
+  revalidatePath("/meu-vale");
+  return { success: true };
+}
