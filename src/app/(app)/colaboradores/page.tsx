@@ -38,7 +38,7 @@ export default async function ColaboradoresPage() {
       .eq("user_id", access.ownerId),
     supabase
       .from("sales")
-      .select("created_by_collaborator_id, customer_id, total, status")
+      .select("created_by_collaborator_id, customer_id, total, status, is_opening_balance")
       .eq("user_id", access.ownerId),
     supabase
       .from("payments")
@@ -67,7 +67,7 @@ export default async function ColaboradoresPage() {
 
   const salesTotals = new Map<string, { total: number; count: number }>();
   for (const sale of sales) {
-    if (sale.status === "cancelled") continue;
+    if (sale.status === "cancelled" || sale.is_opening_balance) continue;
 
     // Se a venda foi feita diretamente por um colaborador, ele é o responsável.
     // Quando o proprietário lança a venda, usamos o colaborador responsável pela ficha do cliente.
