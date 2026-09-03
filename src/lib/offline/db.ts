@@ -1,4 +1,4 @@
-export type OfflineOperationType = "sale" | "payment" | "expense";
+export type OfflineOperationType = "sale" | "payment" | "payment_purchase" | "expense";
 export type OfflineOperationStatus = "pending" | "failed";
 
 export interface OfflineOperation {
