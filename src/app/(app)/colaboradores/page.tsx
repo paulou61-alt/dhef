@@ -134,7 +134,7 @@ export default async function ColaboradoresPage() {
                     salesTotal={salesMetric.total}
                     salesCount={salesMetric.count}
                     collectionsTotal={collectionTotals.get(collaborator.id) ?? 0}
-                    valeBalance={Math.max(0, valeBalances.get(collaborator.id) ?? 0)}
+                    valeBalance={valeBalances.get(collaborator.id) ?? 0}
                     valeMovements={valesByCollaborator.get(collaborator.id) ?? []}
                   />
 
