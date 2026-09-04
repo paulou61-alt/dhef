@@ -10,9 +10,9 @@ export default async function EditarProdutoPage({ params }: { params: { id: stri
   const { data: product } = await supabase.from("products").select("*").eq("id", params.id).single();
   if (!product) notFound();
 
-  const boundAction = async (formData: FormData) => updateProduct(product.id, formData);
-  // O ProductForm em modo edição não usa variações, mas mantemos a assinatura compatível
-  const wrappedAction = async (formData: FormData, _variants: unknown) => boundAction(formData);
+  // Mantém a Server Action registrada pelo Next.js e fixa somente o ID do produto.
+  // O ProductForm envia também o payload de variações, que é ignorado no modo edição.
+  const updateAction = updateProduct.bind(null, product.id);
 
   return (
     <div className="space-y-4">
@@ -24,7 +24,7 @@ export default async function EditarProdutoPage({ params }: { params: { id: stri
         {product.name}
       </Link>
       <h1 className="text-xl font-bold text-slate-900">Editar produto</h1>
-      <ProductForm product={product} action={wrappedAction} isEditing />
+      <ProductForm product={product} action={updateAction} isEditing />
     </div>
   );
 }
