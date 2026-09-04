@@ -32,6 +32,14 @@ export interface CollaboratorValeInput {
   notes?: string;
 }
 
+export interface UpdateCollaboratorValeMovementInput {
+  movementId: string;
+  collaboratorId: string;
+  amount: number;
+  movementDate?: string;
+  notes?: string;
+}
+
 async function callCollaboratorManager(payload: Record<string, unknown>) {
   const supabase = createClient();
   const { data: { session } } = await supabase.auth.getSession();
@@ -235,6 +243,46 @@ export async function addCollaboratorValeMovement(
   }
 
   revalidatePath("/colaboradores");
+  return { success: true };
+}
+
+export async function updateCollaboratorValeMovement(
+  input: UpdateCollaboratorValeMovementInput
+): Promise<{ error?: string; success?: boolean }> {
+  const access = await getAccessContext();
+  if (!access || access.role !== "owner") {
+    return { error: "Apenas o proprietário pode editar lançamentos de vale." };
+  }
+
+  const movementId = input.movementId?.trim();
+  const collaboratorId = input.collaboratorId?.trim();
+  const amount = Number(input.amount);
+  const movementDate = input.movementDate || new Date().toISOString().slice(0, 10);
+  const notes = input.notes?.trim().slice(0, 240) || null;
+
+  if (!movementId || !collaboratorId) return { error: "Lançamento inválido." };
+  if (!Number.isFinite(amount) || amount <= 0) return { error: "Informe um valor maior que zero." };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(movementDate)) return { error: "Informe uma data válida." };
+
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("collaborator_vale_movements")
+    .update({
+      amount: Number(amount.toFixed(2)),
+      movement_date: movementDate,
+      notes,
+    })
+    .eq("id", movementId)
+    .eq("owner_id", access.ownerId)
+    .eq("collaborator_id", collaboratorId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) return { error: "Não foi possível editar este lançamento." };
+  if (!data) return { error: "Lançamento não encontrado." };
+
+  revalidatePath("/colaboradores");
+  revalidatePath("/meu-vale");
   return { success: true };
 }
 
