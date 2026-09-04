@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Banknote, CalendarDays, Check, Eye, HandCoins, Minus, Phone, Plus, ReceiptText, ShoppingBag, X, PencilLine, Save } from "lucide-react";
-import { addCollaboratorValeMovement, setCollaboratorValeBalance, updateCollaboratorPermissions } from "@/app/(app)/colaboradores/actions";
+import { addCollaboratorValeMovement, setCollaboratorValeBalance, updateCollaboratorPermissions, updateCollaboratorValeMovement } from "@/app/(app)/colaboradores/actions";
 import { RemoveCollaboratorButton } from "@/components/collaborators/RemoveCollaboratorButton";
 import { getAllowedViewPermissions, VIEW_PERMISSION_LABELS, type ViewPermission } from "@/lib/permissions";
 import { formatCurrency, formatDate } from "@/utils/format";
@@ -30,6 +30,10 @@ export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissio
   const [amount, setAmount] = useState("");
   const [notes, setNotes] = useState("");
   const [movementDate, setMovementDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [editingMovementId, setEditingMovementId] = useState<string | null>(null);
+  const [editMovementAmount, setEditMovementAmount] = useState("");
+  const [editMovementDate, setEditMovementDate] = useState("");
+  const [editMovementNotes, setEditMovementNotes] = useState("");
   const [editingValeBalance, setEditingValeBalance] = useState(false);
   const [valeBalanceInput, setValeBalanceInput] = useState(() => valeBalance.toFixed(2));
   const [permissions, setPermissions] = useState<ViewPermission[]>(viewPermissions);
@@ -79,6 +83,46 @@ export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissio
       const result = await addCollaboratorValeMovement({ collaboratorId: collaborator.id, movementType: mode, amount: parsed, movementDate, notes });
       if (result.error) return setError(result.error);
       resetVale(null);
+      router.refresh();
+    });
+  }
+
+  function startEditingMovement(movement: ValeMovement) {
+    setEditingMovementId(movement.id);
+    setEditMovementAmount(Number(movement.amount).toFixed(2));
+    setEditMovementDate(movement.movement_date);
+    setEditMovementNotes(movement.notes ?? "");
+    setError(null);
+    setSuccess(null);
+  }
+
+  function cancelEditingMovement() {
+    setEditingMovementId(null);
+    setEditMovementAmount("");
+    setEditMovementDate("");
+    setEditMovementNotes("");
+  }
+
+  function saveMovementEdit(movement: ValeMovement) {
+    const parsed = Number(editMovementAmount.replace(",", "."));
+    if (!Number.isFinite(parsed) || parsed <= 0) return setError("Informe um valor maior que zero.");
+    if (!editMovementDate) return setError("Informe a data do lançamento.");
+
+    setError(null);
+    setSuccess(null);
+    startTransition(async () => {
+      const result = await updateCollaboratorValeMovement({
+        movementId: movement.id,
+        collaboratorId: collaborator.id,
+        amount: parsed,
+        movementDate: editMovementDate,
+        notes: editMovementNotes,
+      });
+
+      if (result.error) return setError(result.error);
+
+      cancelEditingMovement();
+      setSuccess("Lançamento atualizado.");
       router.refresh();
     });
   }
@@ -178,7 +222,119 @@ export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissio
 
           {(error || success) && <p className={`rounded-xl px-3 py-2 text-sm font-medium ${error ? "bg-danger/10 text-danger" : "bg-success/10 text-success"}`}>{error || success}</p>}
 
-          <section><h3 className="mb-3 text-sm font-bold text-slate-900">Histórico de vales</h3>{recentMovements.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-200 py-8 text-center text-sm text-slate-500">Nenhum vale registrado.</div> : <div className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-100">{recentMovements.map((movement) => <div key={movement.id} className="flex items-center gap-3 px-4 py-3"><span className={`flex h-9 w-9 items-center justify-center rounded-xl ${movement.movement_type === "vale" ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>{movement.movement_type === "vale" ? <Minus size={16} /> : <Plus size={16} />}</span><div className="min-w-0 flex-1"><p className="text-sm font-semibold text-slate-800">{movement.movement_type === "vale" ? "Vale" : "Saldo"}</p><p className="flex items-center gap-1 text-[11px] text-slate-500"><CalendarDays size={11} />{formatDate(movement.movement_date)}{movement.notes ? ` · ${movement.notes}` : ""}</p></div><p className={`text-sm font-bold ${movement.movement_type === "vale" ? "text-amber-700" : "text-emerald-700"}`}>{movement.movement_type === "vale" ? "-" : "+"} {formatCurrency(Number(movement.amount))}</p></div>)}</div>}</section>
+          <section>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h3 className="text-sm font-bold text-slate-900">Histórico de vales</h3>
+              <span className="text-[11px] text-slate-400">Use o lápis para corrigir um lançamento</span>
+            </div>
+            {recentMovements.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-200 py-8 text-center text-sm text-slate-500">Nenhum vale registrado.</div>
+            ) : (
+              <div className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-100">
+                {recentMovements.map((movement) => {
+                  const isVale = movement.movement_type === "vale";
+                  const isEditingMovement = editingMovementId === movement.id;
+
+                  return (
+                    <div key={movement.id} className="px-4 py-3">
+                      {isEditingMovement ? (
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2">
+                            <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${isVale ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>
+                              {isVale ? <Minus size={16} /> : <Plus size={16} />}
+                            </span>
+                            <div>
+                              <p className="text-sm font-semibold text-slate-800">Editar {isVale ? "Vale" : "Saldo"}</p>
+                              <p className="text-[11px] text-slate-500">A correção altera o saldo automaticamente.</p>
+                            </div>
+                          </div>
+
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            <div>
+                              <label className="label">Valor *</label>
+                              <input
+                                type="number"
+                                min="0.01"
+                                step="0.01"
+                                value={editMovementAmount}
+                                onChange={(e) => setEditMovementAmount(e.target.value)}
+                                className="input-field"
+                              />
+                            </div>
+                            <div>
+                              <label className="label">Data</label>
+                              <input
+                                type="date"
+                                value={editMovementDate}
+                                onChange={(e) => setEditMovementDate(e.target.value)}
+                                className="input-field"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="label">Observação</label>
+                            <input
+                              value={editMovementNotes}
+                              maxLength={240}
+                              onChange={(e) => setEditMovementNotes(e.target.value)}
+                              className="input-field"
+                              placeholder="Opcional"
+                            />
+                          </div>
+
+                          <div className="flex justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={cancelEditingMovement}
+                              disabled={pending}
+                              className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600"
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => saveMovementEdit(movement)}
+                              disabled={pending}
+                              className="inline-flex items-center gap-1 rounded-xl bg-brand-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                            >
+                              <Save size={13} /> {pending ? "Salvando..." : "Salvar alteração"}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-3">
+                          <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${isVale ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>
+                            {isVale ? <Minus size={16} /> : <Plus size={16} />}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-slate-800">{isVale ? "Vale" : "Saldo"}</p>
+                            <p className="flex items-center gap-1 text-[11px] text-slate-500">
+                              <CalendarDays size={11} />
+                              {formatDate(movement.movement_date)}
+                              {movement.notes ? ` · ${movement.notes}` : ""}
+                            </p>
+                          </div>
+                          <p className={`text-sm font-bold ${isVale ? "text-amber-700" : "text-emerald-700"}`}>
+                            {isVale ? "-" : "+"} {formatCurrency(Number(movement.amount))}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => startEditingMovement(movement)}
+                            className="flex h-8 w-8 flex-none items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-brand-600"
+                            aria-label={`Editar lançamento de ${isVale ? "vale" : "saldo"}`}
+                            title="Editar lançamento"
+                          >
+                            <PencilLine size={14} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
         </div>
       </div>
     </div>}
