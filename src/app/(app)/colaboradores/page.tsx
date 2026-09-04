@@ -131,7 +131,6 @@ export default async function ColaboradoresPage() {
                     collaborator={{ id: collaborator.id, name: collaborator.name, phone: collaborator.phone, role }}
                     hasAccess={hasAccess}
                     viewPermissions={normalizeViewPermissions(role, collaborator.view_permissions as string[] | null)}
-                    salesTotal={salesMetric.total}
                     salesCount={salesMetric.count}
                     collectionsTotal={collectionTotals.get(collaborator.id) ?? 0}
                     valeBalance={valeBalances.get(collaborator.id) ?? 0}
