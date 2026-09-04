@@ -94,7 +94,7 @@ export default async function ColaboradoresPage() {
     const list = valesByCollaborator.get(movement.collaborator_id) ?? [];
     list.push(movement);
     valesByCollaborator.set(movement.collaborator_id, list);
-    const signedAmount = movement.movement_type === "vale" ? Number(movement.amount ?? 0) : -Number(movement.amount ?? 0);
+    const signedAmount = movement.movement_type === "vale" ? -Number(movement.amount ?? 0) : Number(movement.amount ?? 0);
     valeBalances.set(movement.collaborator_id, (valeBalances.get(movement.collaborator_id) ?? 0) + signedAmount);
   }
 

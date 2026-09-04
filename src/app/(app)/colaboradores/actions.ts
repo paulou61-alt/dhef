@@ -217,7 +217,7 @@ export async function setCollaboratorValeBalance(input: {
   const collaboratorId = input.collaboratorId?.trim();
   const targetBalance = Number(input.balance);
   if (!collaboratorId) return { error: "Colaborador inválido." };
-  if (!Number.isFinite(targetBalance) || targetBalance < 0) return { error: "Informe um saldo válido, igual ou maior que zero." };
+  if (!Number.isFinite(targetBalance)) return { error: "Informe um saldo válido." };
 
   const supabase = createClient();
   const { data: collaborator } = await supabase
@@ -239,7 +239,7 @@ export async function setCollaboratorValeBalance(input: {
 
   const currentBalance = (movements ?? []).reduce((sum, movement) => {
     const amount = Number(movement.amount ?? 0);
-    return sum + (movement.movement_type === "vale" ? amount : -amount);
+    return sum + (movement.movement_type === "vale" ? -amount : amount);
   }, 0);
 
   const normalizedTarget = Number(targetBalance.toFixed(2));
@@ -249,7 +249,7 @@ export async function setCollaboratorValeBalance(input: {
   const { error } = await supabase.from("collaborator_vale_movements").insert({
     owner_id: access.ownerId,
     collaborator_id: collaboratorId,
-    movement_type: difference > 0 ? "vale" : "abatimento",
+    movement_type: difference > 0 ? "abatimento" : "vale",
     amount: Math.abs(difference),
     movement_date: new Date().toISOString().slice(0, 10),
     notes: "Ajuste manual de saldo",

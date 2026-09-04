@@ -187,7 +187,7 @@ export async function getMonthlyBusinessReport(monthValue?: string | null) {
 
   const valeBalanceByCollaborator = new Map<string, number>();
   (valeMovements ?? []).forEach((movement) => {
-    const signal = movement.movement_type === "vale" ? 1 : -1;
+    const signal = movement.movement_type === "vale" ? -1 : 1;
     valeBalanceByCollaborator.set(
       movement.collaborator_id,
       (valeBalanceByCollaborator.get(movement.collaborator_id) ?? 0) + signal * Number(movement.amount),
