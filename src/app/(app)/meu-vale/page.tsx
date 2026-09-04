@@ -36,7 +36,7 @@ export default async function MeuValePage() {
   const totalAbatido = movements
     .filter((movement) => movement.movement_type === "abatimento")
     .reduce((sum, movement) => sum + Number(movement.amount ?? 0), 0);
-  const balance = Math.max(0, totalVales - totalAbatido);
+  const balance = totalVales - totalAbatido;
 
   return (
     <div className="space-y-4">
@@ -79,7 +79,7 @@ export default async function MeuValePage() {
 
         <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
           <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700">
-            <Minus size={15} /> Total abatido
+            <Minus size={15} /> Total retirado
           </div>
           <p className="mt-2 text-xl font-bold text-emerald-900">{formatCurrency(totalAbatido)}</p>
         </div>
@@ -106,7 +106,7 @@ export default async function MeuValePage() {
                     {isVale ? <Plus size={17} /> : <Minus size={17} />}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-slate-800">{isVale ? "Vale" : "Abatimento"}</p>
+                    <p className="text-sm font-semibold text-slate-800">{isVale ? "Vale" : "Retirada"}</p>
                     <p className="mt-0.5 flex flex-wrap items-center gap-1 text-[11px] text-slate-500">
                       <CalendarDays size={11} />
                       {formatDate(movement.movement_date)}
