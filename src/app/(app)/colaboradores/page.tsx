@@ -28,7 +28,7 @@ export default async function ColaboradoresPage() {
   const [collaboratorsResult, customersResult, salesResult, paymentsResult, valesResult] = await Promise.all([
     supabase
       .from("collaborators")
-      .select("id, name, phone, role, is_active, auth_user_id, accepted_at, view_permissions")
+      .select("id, name, phone, role, is_active, auth_user_id, accepted_at, view_permissions, username")
       .eq("owner_id", access.ownerId)
       .eq("is_active", true)
       .order("name"),
@@ -138,14 +138,14 @@ export default async function ColaboradoresPage() {
                     valeMovements={valesByCollaborator.get(collaborator.id) ?? []}
                   />
 
-                  {!hasAccess && (
-                    <div className="flex justify-end px-4 pb-3">
-                      <CollaboratorAccessButton
-                        collaboratorId={collaborator.id}
-                        collaboratorName={collaborator.name}
-                      />
-                    </div>
-                  )}
+                  <div className="flex justify-end px-4 pb-3">
+                    <CollaboratorAccessButton
+                      collaboratorId={collaborator.id}
+                      collaboratorName={collaborator.name}
+                      hasAccess={hasAccess}
+                      username={collaborator.username}
+                    />
+                  </div>
                 </div>
               );
             })}
