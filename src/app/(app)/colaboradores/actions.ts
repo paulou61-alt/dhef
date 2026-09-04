@@ -19,6 +19,11 @@ export interface CreateCollaboratorAccessInput {
   password: string;
 }
 
+export interface SetCollaboratorPasswordInput {
+  collaboratorId: string;
+  password: string;
+}
+
 export interface CollaboratorValeInput {
   collaboratorId: string;
   movementType: "vale" | "abatimento";
@@ -113,6 +118,32 @@ export async function createCollaboratorAccess(
   });
 
   if (!result.ok) return { error: result.error || "Não foi possível criar o acesso do colaborador." };
+
+  revalidatePath("/colaboradores");
+  return { success: true };
+}
+
+export async function setCollaboratorPassword(
+  input: SetCollaboratorPasswordInput
+): Promise<{ error?: string; success?: boolean }> {
+  const access = await getAccessContext();
+  if (!access || access.role !== "owner") {
+    return { error: "Apenas o proprietário pode definir a senha do colaborador." };
+  }
+
+  const collaboratorId = input.collaboratorId?.trim();
+  const password = input.password ?? "";
+
+  if (!collaboratorId) return { error: "Colaborador inválido." };
+  if (password.length < 8) return { error: "A nova senha deve ter pelo menos 8 caracteres." };
+
+  const result = await callCollaboratorManager({
+    action: "set_password",
+    collaboratorId,
+    password,
+  });
+
+  if (!result.ok) return { error: result.error || "Não foi possível definir a nova senha." };
 
   revalidatePath("/colaboradores");
   return { success: true };

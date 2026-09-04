@@ -89,6 +89,12 @@ export default function LoginPage() {
           {error && <p className="rounded-xl bg-danger/10 px-4 py-3 text-sm text-danger">{error}</p>}
           <button type="submit" className="btn-primary w-full" disabled={loading}>{loading ? "Entrando..." : "Entrar"}</button>
         </form>
+
+        <div className="mt-5 text-center">
+          <Link href="/colaborador/login" className="text-sm font-semibold text-brand-600">
+            Acesso exclusivo para colaboradores
+          </Link>
+        </div>
       </div>
     </div>
   );
