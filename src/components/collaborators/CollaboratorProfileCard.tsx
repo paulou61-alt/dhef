@@ -15,7 +15,6 @@ type Props = {
   collaborator: { id: string; name: string; phone: string | null; role: Role };
   hasAccess: boolean;
   viewPermissions: ViewPermission[];
-  salesTotal: number;
   salesCount: number;
   collectionsTotal: number;
   valeBalance: number;
@@ -24,7 +23,7 @@ type Props = {
 
 const ROLE_LABELS: Record<Role, string> = { vendedor: "Vendedor", cobrador: "Cobrador" };
 
-export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissions, salesTotal, salesCount, collectionsTotal, valeBalance, valeMovements }: Props) {
+export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissions, salesCount, collectionsTotal, valeBalance, valeMovements }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"vale" | "abatimento" | null>(null);
@@ -129,7 +128,7 @@ export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissio
 
         <div className="space-y-5 p-5">
           <div className="grid grid-cols-2 gap-3">
-            <Metric icon={<ShoppingBag size={15} />} label="Saldo de vendas" value={formatCurrency(salesTotal)} helper={`${salesCount} venda(s)`} />
+            <Metric icon={<ShoppingBag size={15} />} label="Vendas atribuídas" value={String(salesCount)} helper="Sem exibir valor financeiro" />
             <div className={`rounded-2xl border p-3.5 ${valeBalance < 0 ? "border-red-200 bg-red-50" : valeBalance > 0 ? "border-emerald-200 bg-emerald-50" : "border-slate-100 bg-slate-50"}`}>
               <div className={`flex items-center justify-between gap-2 text-xs font-semibold ${valeBalance < 0 ? "text-red-700" : valeBalance > 0 ? "text-emerald-700" : "text-slate-500"}`}>
                 <span className="flex items-center gap-2"><HandCoins size={15} />Saldo de vale</span>
