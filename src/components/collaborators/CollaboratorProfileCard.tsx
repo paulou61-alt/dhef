@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Banknote, CalendarDays, Check, Eye, HandCoins, Minus, Phone, Plus, ReceiptText, ShoppingBag, X, PencilLine, Save } from "lucide-react";
-import { addCollaboratorValeMovement, setCollaboratorValeBalance, updateCollaboratorPermissions, updateCollaboratorValeMovement } from "@/app/(app)/colaboradores/actions";
+import { Banknote, CalendarDays, Check, Eye, HandCoins, Minus, Phone, Plus, ReceiptText, ShoppingBag, X, PencilLine, Save, Trash2 } from "lucide-react";
+import { addCollaboratorValeMovement, deleteCollaboratorValeMovement, setCollaboratorValeBalance, updateCollaboratorPermissions, updateCollaboratorValeMovement } from "@/app/(app)/colaboradores/actions";
 import { RemoveCollaboratorButton } from "@/components/collaborators/RemoveCollaboratorButton";
 import { getAllowedViewPermissions, VIEW_PERMISSION_LABELS, type ViewPermission } from "@/lib/permissions";
 import { formatCurrency, formatDate } from "@/utils/format";
@@ -34,6 +34,7 @@ export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissio
   const [editMovementAmount, setEditMovementAmount] = useState("");
   const [editMovementDate, setEditMovementDate] = useState("");
   const [editMovementNotes, setEditMovementNotes] = useState("");
+  const [deletingMovementId, setDeletingMovementId] = useState<string | null>(null);
   const [editingValeBalance, setEditingValeBalance] = useState(false);
   const [valeBalanceInput, setValeBalanceInput] = useState(() => valeBalance.toFixed(2));
   const [permissions, setPermissions] = useState<ViewPermission[]>(viewPermissions);
@@ -123,6 +124,24 @@ export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissio
 
       cancelEditingMovement();
       setSuccess("Lançamento atualizado.");
+      router.refresh();
+    });
+  }
+
+  function deleteMovement(movement: ValeMovement) {
+    setError(null);
+    setSuccess(null);
+    startTransition(async () => {
+      const result = await deleteCollaboratorValeMovement({
+        movementId: movement.id,
+        collaboratorId: collaborator.id,
+      });
+
+      if (result.error) return setError(result.error);
+
+      setDeletingMovementId(null);
+      if (editingMovementId === movement.id) cancelEditingMovement();
+      setSuccess("Lançamento apagado. O saldo foi recalculado.");
       router.refresh();
     });
   }
@@ -225,7 +244,7 @@ export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissio
           <section>
             <div className="mb-3 flex items-center justify-between gap-3">
               <h3 className="text-sm font-bold text-slate-900">Histórico de vales</h3>
-              <span className="text-[11px] text-slate-400">Use o lápis para corrigir um lançamento</span>
+              <span className="text-[11px] text-slate-400">Edite ou apague lançamentos incorretos</span>
             </div>
             {recentMovements.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-200 py-8 text-center text-sm text-slate-500">Nenhum vale registrado.</div>
@@ -327,6 +346,40 @@ export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissio
                           >
                             <PencilLine size={14} />
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => { setDeletingMovementId(movement.id); setError(null); setSuccess(null); }}
+                            className="flex h-8 w-8 flex-none items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-danger"
+                            aria-label={`Apagar lançamento de ${isVale ? "vale" : "saldo"}`}
+                            title="Apagar lançamento"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      )}
+                      {deletingMovementId === movement.id && (
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-red-100 bg-red-50 px-3 py-2.5">
+                          <p className="text-xs font-semibold text-red-700">
+                            Apagar este lançamento de {isVale ? "vale" : "saldo"} de {formatCurrency(Number(movement.amount))}?
+                          </p>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setDeletingMovementId(null)}
+                              disabled={pending}
+                              className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600"
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => deleteMovement(movement)}
+                              disabled={pending}
+                              className="inline-flex items-center gap-1 rounded-lg bg-red-600 px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-50"
+                            >
+                              <Trash2 size={12} /> {pending ? "Apagando..." : "Apagar"}
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>
