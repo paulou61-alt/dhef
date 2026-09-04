@@ -200,7 +200,6 @@ export async function addCollaboratorValeMovement(
   });
 
   if (error) {
-    if (error.message.toLowerCase().includes("abatimento não pode")) return { error: "O abatimento não pode ser maior que o saldo em vale." };
     return { error: "Não foi possível registrar a movimentação do vale." };
   }
 
@@ -257,7 +256,6 @@ export async function setCollaboratorValeBalance(input: {
   });
 
   if (error) {
-    if (error.message.toLowerCase().includes("abatimento não pode")) return { error: "O novo saldo não pode gerar um abatimento maior que o saldo atual." };
     return { error: "Não foi possível atualizar o saldo em vale." };
   }
 
