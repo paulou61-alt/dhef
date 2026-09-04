@@ -286,6 +286,37 @@ export async function updateCollaboratorValeMovement(
   return { success: true };
 }
 
+export async function deleteCollaboratorValeMovement(input: {
+  movementId: string;
+  collaboratorId: string;
+}): Promise<{ error?: string; success?: boolean }> {
+  const access = await getAccessContext();
+  if (!access || access.role !== "owner") {
+    return { error: "Apenas o proprietário pode apagar lançamentos de vale." };
+  }
+
+  const movementId = input.movementId?.trim();
+  const collaboratorId = input.collaboratorId?.trim();
+  if (!movementId || !collaboratorId) return { error: "Lançamento inválido." };
+
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("collaborator_vale_movements")
+    .delete()
+    .eq("id", movementId)
+    .eq("owner_id", access.ownerId)
+    .eq("collaborator_id", collaboratorId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) return { error: "Não foi possível apagar este lançamento." };
+  if (!data) return { error: "Lançamento não encontrado." };
+
+  revalidatePath("/colaboradores");
+  revalidatePath("/meu-vale");
+  return { success: true };
+}
+
 export async function setCollaboratorValeBalance(input: {
   collaboratorId: string;
   balance: number;
