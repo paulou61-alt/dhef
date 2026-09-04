@@ -86,7 +86,7 @@ export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissio
 
   function saveValeBalance() {
     const parsed = Number(valeBalanceInput.replace(",", "."));
-    if (!Number.isFinite(parsed) || parsed < 0) return setError("Informe um saldo válido, igual ou maior que zero.");
+    if (!Number.isFinite(parsed)) return setError("Informe um saldo válido.");
     setError(null); setSuccess(null);
     startTransition(async () => {
       const result = await setCollaboratorValeBalance({ collaboratorId: collaborator.id, balance: parsed });
@@ -108,8 +108,8 @@ export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissio
         </div>
       </button>
       <div className="ml-auto text-right">
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Vale em aberto</p>
-        <p className={`text-sm font-bold ${valeBalance > 0 ? "text-warning" : "text-slate-500"}`}>{formatCurrency(valeBalance)}</p>
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Saldo de vale</p>
+        <p className={`text-sm font-bold ${valeBalance < 0 ? "text-danger" : valeBalance > 0 ? "text-success" : "text-slate-500"}`}>{formatCurrency(valeBalance)}</p>
         <p className="mt-0.5 text-[10px] text-slate-400">{hasAccess ? "Acesso ao sistema ativo" : "Cadastro interno"}</p>
       </div>
       <RemoveCollaboratorButton collaboratorId={collaborator.id} collaboratorName={collaborator.name} />
@@ -130,16 +130,15 @@ export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissio
         <div className="space-y-5 p-5">
           <div className="grid grid-cols-2 gap-3">
             <Metric icon={<ShoppingBag size={15} />} label="Saldo de vendas" value={formatCurrency(salesTotal)} helper={`${salesCount} venda(s)`} />
-            <div className={`rounded-2xl border p-3.5 ${valeBalance > 0 ? "border-amber-200 bg-amber-50" : "border-slate-100 bg-slate-50"}`}>
-              <div className={`flex items-center justify-between gap-2 text-xs font-semibold ${valeBalance > 0 ? "text-amber-700" : "text-slate-500"}`}>
-                <span className="flex items-center gap-2"><HandCoins size={15} />Saldo em vale</span>
+            <div className={`rounded-2xl border p-3.5 ${valeBalance < 0 ? "border-red-200 bg-red-50" : valeBalance > 0 ? "border-emerald-200 bg-emerald-50" : "border-slate-100 bg-slate-50"}`}>
+              <div className={`flex items-center justify-between gap-2 text-xs font-semibold ${valeBalance < 0 ? "text-red-700" : valeBalance > 0 ? "text-emerald-700" : "text-slate-500"}`}>
+                <span className="flex items-center gap-2"><HandCoins size={15} />Saldo de vale</span>
                 {!editingValeBalance && <button type="button" onClick={() => { setEditingValeBalance(true); setError(null); setSuccess(null); }} className="rounded-lg p-1 hover:bg-white/70" aria-label="Editar saldo em vale"><PencilLine size={14} /></button>}
               </div>
               {editingValeBalance ? (
                 <div className="mt-2 space-y-2">
                   <input
                     type="number"
-                    min="0"
                     step="0.01"
                     value={valeBalanceInput}
                     onChange={(e) => setValeBalanceInput(e.target.value)}
@@ -152,7 +151,7 @@ export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissio
                   </div>
                 </div>
               ) : (
-                <><p className={`mt-2 text-lg font-bold ${valeBalance > 0 ? "text-amber-800" : "text-slate-900"}`}>{formatCurrency(valeBalance)}</p><p className="mt-0.5 text-[11px] text-slate-500">Toque no lápis para editar</p></>
+                <><p className={`mt-2 text-lg font-bold ${valeBalance < 0 ? "text-red-800" : valeBalance > 0 ? "text-emerald-800" : "text-slate-900"}`}>{formatCurrency(valeBalance)}</p><p className="mt-0.5 text-[11px] text-slate-500">Vale entra negativo; Saldo entra positivo.</p></>
               )}
             </div>
             <Metric icon={<ReceiptText size={15} />} label="Recebido em cobranças" value={formatCurrency(collectionsTotal)} />
@@ -174,13 +173,13 @@ export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissio
           </section>
 
           <section className="rounded-2xl border border-slate-100 p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="text-sm font-bold text-slate-900">Vale do colaborador</h3><p className="text-xs text-slate-500">Adicione saldo ou registre quanto o colaborador retirou.</p></div><div className="flex gap-2"><button type="button" onClick={() => resetVale(mode === "vale" ? null : "vale")} className="inline-flex items-center gap-1 rounded-xl bg-brand-600 px-3 py-2 text-xs font-semibold text-white"><Plus size={14} />Registrar vale</button><button type="button" onClick={() => resetVale(mode === "abatimento" ? null : "abatimento")} className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700"><Minus size={14} />Registrar retirada</button></div></div>
+            <div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="text-sm font-bold text-slate-900">Vale do colaborador</h3><p className="text-xs text-slate-500">Vale reduz o saldo; Saldo aumenta o valor.</p></div><div className="flex gap-2"><button type="button" onClick={() => resetVale(mode === "vale" ? null : "vale")} className="inline-flex items-center gap-1 rounded-xl bg-brand-600 px-3 py-2 text-xs font-semibold text-white"><Minus size={14} />Registrar vale</button><button type="button" onClick={() => resetVale(mode === "abatimento" ? null : "abatimento")} className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700"><Plus size={14} />Saldo</button></div></div>
             {mode && <div className="mt-4 rounded-2xl bg-slate-50 p-4"><div className="grid gap-3 sm:grid-cols-2"><div><label className="label">Valor *</label><input type="number" min="0.01" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} className="input-field" placeholder="0,00" /></div><div><label className="label">Data</label><input type="date" value={movementDate} onChange={(e) => setMovementDate(e.target.value)} className="input-field" /></div></div><div className="mt-3"><label className="label">Observação</label><input value={notes} onChange={(e) => setNotes(e.target.value)} className="input-field" placeholder="Opcional" /></div><div className="mt-3 flex justify-end gap-2"><button type="button" onClick={() => resetVale(null)} className="px-3 py-2 text-xs font-semibold text-slate-600">Cancelar</button><button type="button" onClick={submitVale} disabled={pending} className="btn-primary !w-auto px-4 py-2 text-xs">{pending ? "Salvando..." : "Confirmar"}</button></div></div>}
           </section>
 
           {(error || success) && <p className={`rounded-xl px-3 py-2 text-sm font-medium ${error ? "bg-danger/10 text-danger" : "bg-success/10 text-success"}`}>{error || success}</p>}
 
-          <section><h3 className="mb-3 text-sm font-bold text-slate-900">Histórico de vales</h3>{recentMovements.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-200 py-8 text-center text-sm text-slate-500">Nenhum vale registrado.</div> : <div className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-100">{recentMovements.map((movement) => <div key={movement.id} className="flex items-center gap-3 px-4 py-3"><span className={`flex h-9 w-9 items-center justify-center rounded-xl ${movement.movement_type === "vale" ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>{movement.movement_type === "vale" ? <Plus size={16} /> : <Minus size={16} />}</span><div className="min-w-0 flex-1"><p className="text-sm font-semibold text-slate-800">{movement.movement_type === "vale" ? "Vale" : "Retirada"}</p><p className="flex items-center gap-1 text-[11px] text-slate-500"><CalendarDays size={11} />{formatDate(movement.movement_date)}{movement.notes ? ` · ${movement.notes}` : ""}</p></div><p className={`text-sm font-bold ${movement.movement_type === "vale" ? "text-amber-700" : "text-emerald-700"}`}>{movement.movement_type === "vale" ? "+" : "-"} {formatCurrency(Number(movement.amount))}</p></div>)}</div>}</section>
+          <section><h3 className="mb-3 text-sm font-bold text-slate-900">Histórico de vales</h3>{recentMovements.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-200 py-8 text-center text-sm text-slate-500">Nenhum vale registrado.</div> : <div className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-100">{recentMovements.map((movement) => <div key={movement.id} className="flex items-center gap-3 px-4 py-3"><span className={`flex h-9 w-9 items-center justify-center rounded-xl ${movement.movement_type === "vale" ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>{movement.movement_type === "vale" ? <Minus size={16} /> : <Plus size={16} />}</span><div className="min-w-0 flex-1"><p className="text-sm font-semibold text-slate-800">{movement.movement_type === "vale" ? "Vale" : "Saldo"}</p><p className="flex items-center gap-1 text-[11px] text-slate-500"><CalendarDays size={11} />{formatDate(movement.movement_date)}{movement.notes ? ` · ${movement.notes}` : ""}</p></div><p className={`text-sm font-bold ${movement.movement_type === "vale" ? "text-amber-700" : "text-emerald-700"}`}>{movement.movement_type === "vale" ? "-" : "+"} {formatCurrency(Number(movement.amount))}</p></div>)}</div>}</section>
         </div>
       </div>
     </div>}
