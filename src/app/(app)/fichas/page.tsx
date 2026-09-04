@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ClipboardList, ChevronRight, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { getAccessContext } from "@/lib/access";
 import { SearchBar } from "@/components/ui/SearchBar";
 import { formatCurrency } from "@/utils/format";
 
@@ -17,9 +19,13 @@ function categoryHref(id: string | null, query: string) {
 }
 
 export default async function FichasPage({ searchParams }: { searchParams: SearchParams }) {
+  const access = await getAccessContext();
+  if (!access) redirect("/login");
+
   const supabase = createClient();
   const query = searchParams.q?.trim() ?? "";
-  const collaboratorFilter = searchParams.colaborador ?? "";
+  const isOwner = access.role === "owner";
+  const collaboratorFilter = isOwner ? (searchParams.colaborador ?? "") : (access.collaboratorId ?? "");
 
   let customerQuery = supabase
     .from("customers")
@@ -30,12 +36,26 @@ export default async function FichasPage({ searchParams }: { searchParams: Searc
     if (/^\d+$/.test(query)) customerQuery = customerQuery.eq("ficha_number", Number(query));
     else customerQuery = customerQuery.ilike("name", `%${query}%`);
   }
-  if (collaboratorFilter === "sem") customerQuery = customerQuery.is("assigned_collaborator_id", null);
-  else if (collaboratorFilter) customerQuery = customerQuery.eq("assigned_collaborator_id", collaboratorFilter);
+  if (!isOwner && access.collaboratorId) {
+    customerQuery = customerQuery.eq("assigned_collaborator_id", access.collaboratorId);
+  } else if (collaboratorFilter === "sem") {
+    customerQuery = customerQuery.is("assigned_collaborator_id", null);
+  } else if (collaboratorFilter) {
+    customerQuery = customerQuery.eq("assigned_collaborator_id", collaboratorFilter);
+  }
+
+  let collaboratorsQuery = supabase
+    .from("collaborators")
+    .select("id, name, role")
+    .eq("is_active", true)
+    .order("name");
+  if (!isOwner && access.collaboratorId) {
+    collaboratorsQuery = collaboratorsQuery.eq("id", access.collaboratorId);
+  }
 
   const [{ data: customers }, { data: collaborators }, { data: sales }, { data: installments }] = await Promise.all([
     customerQuery,
-    supabase.from("collaborators").select("id, name, role").eq("is_active", true).order("name"),
+    collaboratorsQuery,
     supabase.from("sales").select("id, customer_id, total, status, is_opening_balance").eq("status", "completed"),
     supabase.from("installments").select("sale_id, amount, paid_amount, status"),
   ]);
@@ -75,20 +95,22 @@ export default async function FichasPage({ searchParams }: { searchParams: Searc
     <div className="space-y-4">
       <div>
         <h1 className="text-xl font-bold text-slate-900">Fichas</h1>
-        <p className="mt-1 text-sm text-slate-500">Fichas numeradas e organizadas por colaborador responsável.</p>
+        <p className="mt-1 text-sm text-slate-500">{isOwner ? "Fichas numeradas e organizadas por colaborador responsável." : "Aqui aparecem somente as fichas de clientes vinculados a você."}</p>
       </div>
 
       <SearchBar placeholder="Buscar por nome ou número da ficha..." />
 
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        <Link href={categoryHref(null, query)} className={`whitespace-nowrap rounded-full px-3 py-2 text-xs font-semibold ${!collaboratorFilter ? "bg-brand-500 text-white" : "bg-white text-slate-600"}`}>Todos</Link>
-        {(collaborators ?? []).map((collaborator) => (
-          <Link key={collaborator.id} href={categoryHref(collaborator.id, query)} className={`whitespace-nowrap rounded-full px-3 py-2 text-xs font-semibold ${collaboratorFilter === collaborator.id ? "bg-brand-500 text-white" : "bg-white text-slate-600"}`}>
-            {collaborator.name}
-          </Link>
-        ))}
-        <Link href={categoryHref("sem", query)} className={`whitespace-nowrap rounded-full px-3 py-2 text-xs font-semibold ${collaboratorFilter === "sem" ? "bg-brand-500 text-white" : "bg-white text-slate-600"}`}>Sem colaborador</Link>
-      </div>
+      {isOwner && (
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          <Link href={categoryHref(null, query)} className={`whitespace-nowrap rounded-full px-3 py-2 text-xs font-semibold ${!collaboratorFilter ? "bg-brand-500 text-white" : "bg-white text-slate-600"}`}>Todos</Link>
+          {(collaborators ?? []).map((collaborator) => (
+            <Link key={collaborator.id} href={categoryHref(collaborator.id, query)} className={`whitespace-nowrap rounded-full px-3 py-2 text-xs font-semibold ${collaboratorFilter === collaborator.id ? "bg-brand-500 text-white" : "bg-white text-slate-600"}`}>
+              {collaborator.name}
+            </Link>
+          ))}
+          <Link href={categoryHref("sem", query)} className={`whitespace-nowrap rounded-full px-3 py-2 text-xs font-semibold ${collaboratorFilter === "sem" ? "bg-brand-500 text-white" : "bg-white text-slate-600"}`}>Sem colaborador</Link>
+        </div>
+      )}
 
       {!customers || customers.length === 0 ? (
         <div className="card py-12 text-center">

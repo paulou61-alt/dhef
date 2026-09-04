@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ChevronLeft, MapPin, Phone, MessageCircle, UserRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getAccessContext } from "@/lib/access";
@@ -9,10 +9,13 @@ import { whatsappLink } from "@/utils/masks";
 export const dynamic = "force-dynamic";
 
 export default async function FichaClientePage({ params }: { params: { id: string } }) {
-  const supabase = createClient();
   const access = await getAccessContext();
+  if (!access) redirect("/login");
+
+  const supabase = createClient();
   const { data: customer } = await supabase.from("customers").select("*").eq("id", params.id).single();
   if (!customer) notFound();
+  if (access.role !== "owner" && customer.assigned_collaborator_id !== access.collaboratorId) notFound();
 
   const [{ data: responsible }, { data: sales }] = await Promise.all([
     customer.assigned_collaborator_id
