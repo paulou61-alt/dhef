@@ -51,7 +51,9 @@ Deno.serve(async (req: Request) => {
   }
 
   const requestedAction = String(body?.action ?? "create");
-  const action = requestedAction === "remove" || requestedAction === "create_access" ? requestedAction : "create";
+  const allowedActions = new Set(["create", "remove", "create_access", "set_password"]);
+  if (!allowedActions.has(requestedAction)) return json({ error: "Ação inválida." }, 400);
+  const action = requestedAction;
 
   if (action === "remove") {
     const collaboratorId = String(body?.collaboratorId ?? "").trim();
@@ -98,6 +100,35 @@ Deno.serve(async (req: Request) => {
     if (removeError) return json({ error: "Não foi possível remover o colaborador." }, 400);
 
     return json({ ok: true, removed: { id: collaborator.id, name: collaborator.name } });
+  }
+
+  if (action === "set_password") {
+    const collaboratorId = String(body?.collaboratorId ?? "").trim();
+    const password = String(body?.password ?? "");
+
+    if (!collaboratorId) return json({ error: "Colaborador inválido." }, 400);
+    if (password.length < 8) return json({ error: "A nova senha deve ter pelo menos 8 caracteres." }, 400);
+
+    const { data: collaborator, error: collaboratorError } = await admin
+      .from("collaborators")
+      .select("id, auth_user_id, is_active")
+      .eq("id", collaboratorId)
+      .eq("owner_id", owner.id)
+      .maybeSingle();
+
+    if (collaboratorError) return json({ error: "Não foi possível localizar o colaborador." }, 400);
+    if (!collaborator) return json({ error: "Colaborador não encontrado." }, 404);
+    if (!collaborator.is_active) return json({ error: "Este colaborador está desativado." }, 400);
+    if (!collaborator.auth_user_id) return json({ error: "Crie o acesso do colaborador antes de definir uma nova senha." }, 400);
+
+    const { error: passwordError } = await admin.auth.admin.updateUserById(
+      collaborator.auth_user_id,
+      { password }
+    );
+
+    if (passwordError) return json({ error: "Não foi possível definir a nova senha do colaborador." }, 400);
+
+    return json({ ok: true });
   }
 
   if (action === "create_access") {
