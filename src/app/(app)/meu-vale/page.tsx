@@ -33,10 +33,10 @@ export default async function MeuValePage() {
   const totalVales = movements
     .filter((movement) => movement.movement_type === "vale")
     .reduce((sum, movement) => sum + Number(movement.amount ?? 0), 0);
-  const totalAbatido = movements
+  const totalSaldo = movements
     .filter((movement) => movement.movement_type === "abatimento")
     .reduce((sum, movement) => sum + Number(movement.amount ?? 0), 0);
-  const balance = totalVales - totalAbatido;
+  const balance = totalSaldo - totalVales;
 
   return (
     <div className="space-y-4">
@@ -67,28 +67,28 @@ export default async function MeuValePage() {
             <HandCoins size={15} /> Saldo atual
           </div>
           <p className="mt-2 text-2xl font-bold text-amber-900">{formatCurrency(balance)}</p>
-          <p className="mt-1 text-[11px] text-amber-700">Valor em vale ainda não abatido</p>
+          <p className="mt-1 text-[11px] text-amber-700">Vale entra negativo; Saldo entra positivo.</p>
         </div>
 
         <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-            <Plus size={15} /> Total em vales
+            <Minus size={15} /> Total em vales
           </div>
           <p className="mt-2 text-xl font-bold text-slate-900">{formatCurrency(totalVales)}</p>
         </div>
 
         <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
           <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700">
-            <Minus size={15} /> Total retirado
+            <Plus size={15} /> Total em saldo
           </div>
-          <p className="mt-2 text-xl font-bold text-emerald-900">{formatCurrency(totalAbatido)}</p>
+          <p className="mt-2 text-xl font-bold text-emerald-900">{formatCurrency(totalSaldo)}</p>
         </div>
       </div>
 
       <section className="card !p-0">
         <div className="border-b border-slate-100 px-4 py-3">
           <h2 className="text-sm font-bold text-slate-900">Histórico do meu vale</h2>
-          <p className="mt-0.5 text-xs text-slate-500">Todos os lançamentos e abatimentos registrados para você.</p>
+          <p className="mt-0.5 text-xs text-slate-500">Todos os lançamentos de Vale e Saldo registrados para você.</p>
         </div>
 
         {movements.length === 0 ? (
@@ -103,10 +103,10 @@ export default async function MeuValePage() {
               return (
                 <div key={movement.id} className="flex items-center gap-3 px-4 py-3.5">
                   <span className={`flex h-10 w-10 flex-none items-center justify-center rounded-xl ${isVale ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>
-                    {isVale ? <Plus size={17} /> : <Minus size={17} />}
+                    {isVale ? <Minus size={17} /> : <Plus size={17} />}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-slate-800">{isVale ? "Vale" : "Retirada"}</p>
+                    <p className="text-sm font-semibold text-slate-800">{isVale ? "Vale" : "Saldo"}</p>
                     <p className="mt-0.5 flex flex-wrap items-center gap-1 text-[11px] text-slate-500">
                       <CalendarDays size={11} />
                       {formatDate(movement.movement_date)}
@@ -114,7 +114,7 @@ export default async function MeuValePage() {
                     </p>
                   </div>
                   <p className={`text-sm font-bold ${isVale ? "text-amber-700" : "text-emerald-700"}`}>
-                    {isVale ? "+" : "-"} {formatCurrency(Number(movement.amount))}
+                    {isVale ? "-" : "+"} {formatCurrency(Number(movement.amount))}
                   </p>
                 </div>
               );
