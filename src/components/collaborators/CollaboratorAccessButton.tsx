@@ -29,6 +29,7 @@ export function CollaboratorAccessButton({ collaboratorId, collaboratorName, has
   const [mode, setMode] = useState<"create" | "password" | null>(null);
   const [username, setUsername] = useState(currentUsername || suggestedUsername);
   const [password, setPassword] = useState("");
+  const [passwordConfirmation, setPasswordConfirmation] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -39,6 +40,7 @@ export function CollaboratorAccessButton({ collaboratorId, collaboratorName, has
     setMode(null);
     setError(null);
     setPassword("");
+    setPasswordConfirmation("");
     setShowPassword(false);
   }
 
@@ -54,6 +56,7 @@ export function CollaboratorAccessButton({ collaboratorId, collaboratorName, has
   }
 
   function submitCreate() {
+    if (password !== passwordConfirmation) return setError("As senhas não coincidem.");
     setError(null);
     startTransition(async () => {
       const result = await createCollaboratorAccess({
@@ -66,11 +69,13 @@ export function CollaboratorAccessButton({ collaboratorId, collaboratorName, has
 
       setMode(null);
       setPassword("");
+      setPasswordConfirmation("");
       router.refresh();
     });
   }
 
   function submitPassword() {
+    if (password !== passwordConfirmation) return setError("As senhas não coincidem.");
     setError(null);
     startTransition(async () => {
       const result = await setCollaboratorPassword({
@@ -82,6 +87,7 @@ export function CollaboratorAccessButton({ collaboratorId, collaboratorName, has
 
       setMode(null);
       setPassword("");
+      setPasswordConfirmation("");
       router.refresh();
     });
   }
@@ -188,6 +194,21 @@ export function CollaboratorAccessButton({ collaboratorId, collaboratorName, has
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
+              </div>
+
+              <div>
+                <label className="label" htmlFor={`access-password-confirmation-${collaboratorId}`}>
+                  Confirmar senha
+                </label>
+                <input
+                  id={`access-password-confirmation-${collaboratorId}`}
+                  type={showPassword ? "text" : "password"}
+                  className="input-field"
+                  value={passwordConfirmation}
+                  onChange={(event) => setPasswordConfirmation(event.target.value)}
+                  autoComplete="new-password"
+                  placeholder="Digite a mesma senha novamente"
+                />
               </div>
 
               <div className="rounded-xl bg-slate-50 px-3 py-2.5 text-xs text-slate-600">
