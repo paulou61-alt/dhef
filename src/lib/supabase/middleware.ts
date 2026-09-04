@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "@/lib/supabase/config";
 import { firstAllowedPath, normalizeViewPermissions, permissionForPath } from "@/lib/permissions";
 
-const PUBLIC_ROUTES = ["/login", "/recuperar-senha", "/redefinir-senha", "/offline"];
+const PUBLIC_ROUTES = ["/login", "/colaborador/login", "/recuperar-senha", "/redefinir-senha", "/offline"];
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 type CollaboratorAccess = {
@@ -49,7 +49,7 @@ export async function updateSession(request: NextRequest) {
     collaborator = data as CollaboratorAccess | null;
   }
 
-  if (user && pathname === "/login") {
+  if (user && (pathname === "/login" || pathname === "/colaborador/login")) {
     const url = request.nextUrl.clone();
     if (collaborator?.is_active) {
       const permissions = normalizeViewPermissions(collaborator.role, collaborator.view_permissions);
