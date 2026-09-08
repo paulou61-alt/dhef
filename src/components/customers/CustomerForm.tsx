@@ -177,9 +177,21 @@ export function CustomerForm({
           </div>
         </div>
 
-        <div>
-          <label className="label" htmlFor="address">Endereço</label>
-          <input id="address" name="address" className="input-field" placeholder="Rua, número" defaultValue={customer?.address ?? ""} />
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_160px]">
+          <div>
+            <label className="label" htmlFor="address">Endereço</label>
+            <input id="address" name="address" className="input-field" placeholder="Rua, avenida..." defaultValue={customer?.address ?? ""} />
+          </div>
+          <div>
+            <label className="label" htmlFor="house_number">Número da casa</label>
+            <input
+              id="house_number"
+              name="house_number"
+              className="input-field"
+              placeholder="Ex.: 123"
+              defaultValue={customer?.house_number ?? ""}
+            />
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
