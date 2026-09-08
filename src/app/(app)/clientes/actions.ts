@@ -70,6 +70,7 @@ function buildCustomerPayload(formData: FormData) {
     whatsapp: getStringField(formData, "whatsapp"),
     cpf: getStringField(formData, "cpf"),
     address: getStringField(formData, "address"),
+    house_number: getStringField(formData, "house_number"),
     neighborhood: getStringField(formData, "neighborhood"),
     city: getStringField(formData, "city"),
     state: getStringField(formData, "state"),
