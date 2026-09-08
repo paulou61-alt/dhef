@@ -40,6 +40,7 @@ export interface Customer {
   whatsapp: string | null;
   cpf: string | null;
   address: string | null;
+  house_number: string | null;
   neighborhood: string | null;
   city: string | null;
   state: string | null;
