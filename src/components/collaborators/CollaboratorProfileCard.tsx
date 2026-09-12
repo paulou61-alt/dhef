@@ -41,7 +41,7 @@ export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissio
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const recentMovements = useMemo(() => valeMovements.slice(0, 10), [valeMovements]);
+  const recentMovements = useMemo(() => valeMovements, [valeMovements]);
   const allowedPermissions = getAllowedViewPermissions(collaborator.role);
   const permissionsChanged = JSON.stringify([...permissions].sort()) !== JSON.stringify([...viewPermissions].sort());
 
