@@ -18,6 +18,7 @@ type CustomerSummary = {
   phone: string | null;
   whatsapp: string | null;
   ficha_number: number | null;
+  assigned_collaborator_id: string | null;
 };
 
 type DebtInstallment = {
@@ -62,13 +63,14 @@ function normalizeSearch(value: string) {
 export default async function ReceberPage({
   searchParams,
 }: {
-  searchParams?: { q?: string };
+  searchParams?: { q?: string; colaborador?: string };
 }) {
   const supabase = createClient();
-  const [{ data: installments }, { data: sales }, { data: customers }] = await Promise.all([
+  const [{ data: installments }, { data: sales }, { data: customers }, { data: collaborators }] = await Promise.all([
     supabase.from("installments").select("*").in("status", ["pendente", "parcial", "vencido"]).order("due_date"),
     supabase.from("sales").select("id, customer_id, sale_number, is_opening_balance"),
-    supabase.from("customers").select("id, name, phone, whatsapp, ficha_number"),
+    supabase.from("customers").select("id, name, phone, whatsapp, ficha_number, assigned_collaborator_id"),
+    supabase.from("collaborators").select("id, name").order("name"),
   ]);
 
   const saleMap = new Map<string, SaleSummary>(
@@ -117,16 +119,28 @@ export default async function ReceberPage({
   const rawQuery = searchParams?.q ?? "";
   const query = normalizeSearch(rawQuery);
   const numericQuery = rawQuery.replace(/\D/g, "");
-  const filteredDebtors = query
-    ? debtors.filter((debtor) => {
-        const ficha = debtor.customer?.ficha_number != null ? String(debtor.customer.ficha_number) : "";
-        const name = normalizeSearch(debtor.customer?.name ?? "");
-        return (numericQuery.length > 0 && ficha.includes(numericQuery)) || name.includes(query);
-      })
-    : debtors;
+  const collaboratorFilter = searchParams?.colaborador ?? "";
 
-  const totalOpen = debtors.reduce((sum, debtor) => sum + debtor.total, 0);
-  const totalInstallments = debtors.reduce((sum, debtor) => sum + debtor.items.length, 0);
+  const filteredDebtors = debtors.filter((debtor) => {
+    const matchesCollaborator =
+      !collaboratorFilter ||
+      collaboratorFilter === "sem-colaborador"
+        ? collaboratorFilter === "sem-colaborador"
+          ? !debtor.customer?.assigned_collaborator_id
+          : true
+        : debtor.customer?.assigned_collaborator_id === collaboratorFilter;
+
+    if (!matchesCollaborator) return false;
+
+    if (!query) return true;
+
+    const ficha = debtor.customer?.ficha_number != null ? String(debtor.customer.ficha_number) : "";
+    const name = normalizeSearch(debtor.customer?.name ?? "");
+    return (numericQuery.length > 0 && ficha.includes(numericQuery)) || name.includes(query);
+  });
+
+  const totalOpen = filteredDebtors.reduce((sum, debtor) => sum + debtor.total, 0);
+  const totalInstallments = filteredDebtors.reduce((sum, debtor) => sum + debtor.items.length, 0);
 
   return (
     <div className="space-y-4">
@@ -167,9 +181,29 @@ export default async function ReceberPage({
             </a>
           )}
         </form>
+        <div className="mt-3">
+          <label htmlFor="colaborador" className="label">Filtrar por colaborador</label>
+          <select
+            id="colaborador"
+            name="colaborador"
+            defaultValue={collaboratorFilter}
+            className="input-field"
+          >
+            <option value="">Todos os colaboradores</option>
+            <option value="sem-colaborador">Sem colaborador</option>
+            {(collaborators ?? []).map((collaborator) => (
+              <option key={collaborator.id} value={collaborator.id}>{collaborator.name}</option>
+            ))}
+          </select>
+        </div>
         {query && (
           <p className="mt-3 text-xs text-slate-500">
             {filteredDebtors.length} resultado(s) encontrado(s) para <span className="font-semibold text-slate-700">“{rawQuery}”</span>.
+          </p>
+        )}
+        {collaboratorFilter && (
+          <p className="mt-2 text-xs text-slate-500">
+            Filtro de colaborador ativo · {filteredDebtors.length} cliente(s) encontrado(s).
           </p>
         )}
       </div>
