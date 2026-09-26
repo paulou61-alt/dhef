@@ -1,6 +1,7 @@
 import { Search } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { ReceiveButton } from "@/components/finance/ReceiveButton";
+import { CollaboratorFilterSelect } from "@/components/finance/CollaboratorFilterSelect";
 import { formatCurrency, formatDate } from "@/utils/format";
 
 export const dynamic = "force-dynamic";
@@ -122,13 +123,12 @@ export default async function ReceberPage({
   const collaboratorFilter = searchParams?.colaborador ?? "";
 
   const filteredDebtors = debtors.filter((debtor) => {
-    const matchesCollaborator =
-      !collaboratorFilter ||
-      collaboratorFilter === "sem-colaborador"
-        ? collaboratorFilter === "sem-colaborador"
-          ? !debtor.customer?.assigned_collaborator_id
-          : true
-        : debtor.customer?.assigned_collaborator_id === collaboratorFilter;
+    let matchesCollaborator = true;
+    if (collaboratorFilter === "sem-colaborador") {
+      matchesCollaborator = !debtor.customer?.assigned_collaborator_id;
+    } else if (collaboratorFilter) {
+      matchesCollaborator = debtor.customer?.assigned_collaborator_id === collaboratorFilter;
+    }
 
     if (!matchesCollaborator) return false;
 
@@ -185,19 +185,10 @@ export default async function ReceberPage({
 
           <div className="sm:max-w-md">
             <label htmlFor="colaborador" className="label">Filtrar por colaborador</label>
-            <select
-              id="colaborador"
-              name="colaborador"
+            <CollaboratorFilterSelect
+              collaborators={(collaborators ?? []) as { id: string; name: string }[]}
               defaultValue={collaboratorFilter}
-              onChange={(event) => event.currentTarget.form?.requestSubmit()}
-              className="input-field"
-            >
-              <option value="">Todos os colaboradores</option>
-              <option value="sem-colaborador">Sem colaborador</option>
-              {(collaborators ?? []).map((collaborator) => (
-                <option key={collaborator.id} value={collaborator.id}>{collaborator.name}</option>
-              ))}
-            </select>
+            />
           </div>
         </form>
         {query && (

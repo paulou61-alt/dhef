@@ -1,315 +1,211 @@
-import { Search } from "lucide-react";
+import Link from "next/link";
+import {
+  ArrowRight,
+  Banknote,
+  CalendarDays,
+  CircleDollarSign,
+  DollarSign,
+  PackageX,
+  Plus,
+  ReceiptText,
+  ShoppingBag,
+  TrendingUp,
+  UserPlus,
+  Users,
+  Wallet,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { ReceiveButton } from "@/components/finance/ReceiveButton";
-import { CollaboratorFilterSelect } from "@/components/finance/CollaboratorFilterSelect";
+import { getAccessContext } from "@/lib/access";
+import { StatCard } from "@/components/dashboard/StatCard";
+import { OverdueList, type OverdueItem } from "@/components/dashboard/OverdueList";
+import { SimpleList, type SimpleListItem } from "@/components/dashboard/SimpleList";
 import { formatCurrency, formatDate } from "@/utils/format";
 
 export const dynamic = "force-dynamic";
 
-type SaleSummary = {
-  id: string;
-  customer_id: string | null;
-  sale_number: number | string | null;
-  is_opening_balance: boolean;
-};
-
-type CustomerSummary = {
-  id: string;
-  name: string;
-  phone: string | null;
-  whatsapp: string | null;
-  ficha_number: number | null;
-  assigned_collaborator_id: string | null;
-};
-
-type DebtInstallment = {
-  id: string;
-  sale_id: string;
-  amount: number | string;
-  paid_amount: number | string | null;
-  due_date: string;
-  installment_number: number;
-  total_installments: number;
-  status: string;
-};
-
-type DebtLine = {
-  item: DebtInstallment;
-  sale: SaleSummary | undefined;
-  open: number;
-};
-
-type Debtor = {
-  key: string;
-  customer: CustomerSummary | null;
-  items: DebtLine[];
-  total: number;
-  overdue: number;
-  nextDue: string | null;
-};
-
-function phoneLabel(customer: CustomerSummary | null) {
-  if (!customer) return "Não informado";
-  return customer.whatsapp || customer.phone || "Não informado";
+function startOfToday() {
+  const d = new Date();
+  d.setUTCHours(0, 0, 0, 0);
+  return d.toISOString();
 }
 
-function normalizeSearch(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim()
-    .toLowerCase();
+function startOfMonth() {
+  const d = new Date();
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)).toISOString();
 }
 
-export default async function ReceberPage({
-  searchParams,
-}: {
-  searchParams?: { q?: string; colaborador?: string };
-}) {
+function daysFromNow(n: number) {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+function monthLabel() {
+  const text = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(new Date());
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+export default async function DashboardPage() {
   const supabase = createClient();
-  const [{ data: installments }, { data: sales }, { data: customers }, { data: collaborators }] = await Promise.all([
-    supabase.from("installments").select("*").in("status", ["pendente", "parcial", "vencido"]).order("due_date"),
-    supabase.from("sales").select("id, customer_id, sale_number, is_opening_balance"),
-    supabase.from("customers").select("id, name, phone, whatsapp, ficha_number, assigned_collaborator_id"),
-    supabase.from("collaborators").select("id, name").order("name"),
+  const access = await getAccessContext();
+  const today = startOfToday();
+  const monthStart = startOfMonth();
+  const todayDate = new Date().toISOString().slice(0, 10);
+  const in7days = daysFromNow(7);
+
+  const [
+    { data: salesToday },
+    { data: salesMonth },
+    { data: openInstallments },
+    { data: overdueInstallments },
+    { data: upcomingInstallments },
+    { data: recentSales },
+    { data: lowStockVariants },
+    { data: monthExpenses },
+    { data: monthPayments },
+  ] = await Promise.all([
+    supabase.from("sales").select("total").eq("status", "completed").eq("is_opening_balance", false).gte("created_at", today),
+    supabase
+      .from("sales")
+      .select("id, total, sale_items(quantity, unit_cost_snapshot, unit_price_snapshot)")
+      .eq("status", "completed")
+      .eq("is_opening_balance", false)
+      .gte("created_at", monthStart),
+    supabase
+      .from("installments")
+      .select("id, amount, paid_amount, sale_id, sales!inner(customer_id)")
+      .in("status", ["pendente", "parcial", "vencido"]),
+    supabase
+      .from("installments")
+      .select("id, amount, paid_amount, due_date, sales!inner(customer_id, customers(name, phone, whatsapp))")
+      .in("status", ["pendente", "parcial", "vencido"])
+      .lt("due_date", todayDate)
+      .order("due_date", { ascending: true })
+      .limit(10),
+    supabase
+      .from("installments")
+      .select("id, amount, paid_amount, due_date, sales!inner(customers(name))")
+      .in("status", ["pendente", "parcial"])
+      .gte("due_date", todayDate)
+      .lte("due_date", in7days)
+      .order("due_date", { ascending: true })
+      .limit(6),
+    supabase
+      .from("sales")
+      .select("id, total, created_at, sale_number, customers(name)")
+      .eq("status", "completed")
+      .eq("is_opening_balance", false)
+      .order("created_at", { ascending: false })
+      .limit(6),
+    supabase
+      .from("product_variants")
+      .select("id, variant_name, stock_quantity, min_stock, products(name)")
+      .order("stock_quantity", { ascending: true })
+      .limit(100),
+    supabase.from("expenses").select("amount").gte("expense_date", monthStart.slice(0, 10)),
+    supabase.from("payments").select("amount").gte("payment_date", monthStart.slice(0, 10)),
   ]);
 
-  const saleMap = new Map<string, SaleSummary>(
-    (sales ?? []).map((sale) => [sale.id, sale as SaleSummary]),
-  );
-  const customerMap = new Map<string, CustomerSummary>(
-    (customers ?? []).map((customer) => [customer.id, customer as CustomerSummary]),
-  );
+  const revenueToday = (salesToday ?? []).reduce((sum, s) => sum + Number(s.total), 0);
+  const revenueMonth = (salesMonth ?? []).reduce((sum, s) => sum + Number(s.total), 0);
+  const grossProfitMonth = (salesMonth ?? []).reduce((sum, sale: any) => {
+    const saleProfit = (sale.sale_items ?? []).reduce(
+      (itemSum: number, item: any) => itemSum + (Number(item.unit_price_snapshot) - Number(item.unit_cost_snapshot)) * Number(item.quantity),
+      0
+    );
+    return sum + saleProfit;
+  }, 0);
+  const expensesMonth = (monthExpenses ?? []).reduce((sum, item) => sum + Number(item.amount), 0);
+  const netProfitMonth = grossProfitMonth - expensesMonth;
+  const receivedMonth = (monthPayments ?? []).reduce((sum, item) => sum + Number(item.amount), 0);
+  const totalOpen = (openInstallments ?? []).reduce((sum, item: any) => sum + Math.max(0, Number(item.amount) - Number(item.paid_amount)), 0);
+  const owingCustomerIds = new Set((openInstallments ?? []).map((item: any) => item.sales?.customer_id).filter(Boolean));
+  const lowStockItems = (lowStockVariants ?? []).filter((v: any) => Number(v.stock_quantity) <= Number(v.min_stock));
 
-  const debtorMap = new Map<string, Debtor>();
+  const overdueList: OverdueItem[] = (overdueInstallments ?? []).map((i: any) => ({
+    installmentId: i.id,
+    customerName: i.sales?.customers?.name ?? "Cliente",
+    customerPhone: i.sales?.customers?.whatsapp ?? i.sales?.customers?.phone ?? null,
+    amount: Number(i.amount) - Number(i.paid_amount),
+    dueDate: i.due_date,
+  }));
 
-  for (const rawInstallment of installments ?? []) {
-    const item = rawInstallment as DebtInstallment;
-    const sale = saleMap.get(item.sale_id);
-    const customer = sale?.customer_id ? customerMap.get(sale.customer_id) ?? null : null;
-    const key = customer?.id ?? `sem-cliente-${item.sale_id}`;
-    const open = Math.max(0, Number(item.amount) - Number(item.paid_amount ?? 0));
+  const upcomingList: SimpleListItem[] = (upcomingInstallments ?? []).map((i: any) => ({
+    id: i.id,
+    title: i.sales?.customers?.name ?? "Cliente",
+    subtitle: `Vence em ${formatDate(i.due_date)}`,
+    value: Math.max(0, Number(i.amount) - Number(i.paid_amount)),
+    href: "/receber",
+  }));
 
-    const debtor = debtorMap.get(key) ?? {
-      key,
-      customer,
-      items: [],
-      total: 0,
-      overdue: 0,
-      nextDue: null,
-    };
+  const recentSalesList: SimpleListItem[] = (recentSales ?? []).map((s: any) => ({
+    id: s.id,
+    title: s.customers?.name ?? "Venda avulsa",
+    subtitle: `Venda #${s.sale_number} · ${formatDate(s.created_at)}`,
+    value: Number(s.total),
+    href: `/vender/${s.id}`,
+  }));
 
-    debtor.items.push({ item, sale, open });
-    debtor.total += open;
-    if (item.status === "vencido") debtor.overdue += 1;
-    if (!debtor.nextDue || item.due_date < debtor.nextDue) debtor.nextDue = item.due_date;
-    debtorMap.set(key, debtor);
-  }
-
-  const debtors = Array.from(debtorMap.values()).sort((a, b) => {
-    const fichaA = a.customer?.ficha_number;
-    const fichaB = b.customer?.ficha_number;
-
-    if (fichaA != null && fichaB != null && fichaA !== fichaB) return fichaA - fichaB;
-    if (fichaA != null && fichaB == null) return -1;
-    if (fichaA == null && fichaB != null) return 1;
-
-    return (a.customer?.name ?? "").localeCompare(b.customer?.name ?? "", "pt-BR");
-  });
-
-  const rawQuery = searchParams?.q ?? "";
-  const query = normalizeSearch(rawQuery);
-  const numericQuery = rawQuery.replace(/\D/g, "");
-  const collaboratorFilter = searchParams?.colaborador ?? "";
-
-  const filteredDebtors = debtors.filter((debtor) => {
-    let matchesCollaborator = true;
-    if (collaboratorFilter === "sem-colaborador") {
-      matchesCollaborator = !debtor.customer?.assigned_collaborator_id;
-    } else if (collaboratorFilter) {
-      matchesCollaborator = debtor.customer?.assigned_collaborator_id === collaboratorFilter;
-    }
-
-    if (!matchesCollaborator) return false;
-
-    if (!query) return true;
-
-    const ficha = debtor.customer?.ficha_number != null ? String(debtor.customer.ficha_number) : "";
-    const name = normalizeSearch(debtor.customer?.name ?? "");
-    return (numericQuery.length > 0 && ficha.includes(numericQuery)) || name.includes(query);
-  });
-
-  const totalOpen = filteredDebtors.reduce((sum, debtor) => sum + debtor.total, 0);
-  const totalInstallments = filteredDebtors.reduce((sum, debtor) => sum + debtor.items.length, 0);
+  const firstName = access?.name?.trim().split(/\s+/)[0] || "Olá";
 
   return (
-    <div className="space-y-4">
-      <div className="card flex items-center justify-between gap-4">
-        <div>
-          <p className="text-sm text-slate-500">Total a receber</p>
-          <p className="mt-1 text-2xl font-bold text-slate-900">{formatCurrency(totalOpen)}</p>
-        </div>
-        <div className="text-right">
-          <div className="rounded-xl bg-warning/10 px-3 py-2 text-sm font-semibold text-warning">
-            {filteredDebtors.length} cliente(s)
+    <div className="space-y-6">
+      <section className="relative overflow-hidden rounded-[28px] bg-slate-950 p-5 text-white shadow-[0_24px_60px_rgba(15,23,42,0.18)] md:p-7">
+        <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-brand-500/25 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 left-1/3 h-56 w-56 rounded-full bg-indigo-500/15 blur-3xl" />
+        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-slate-400"><CalendarDays size={14} /> {monthLabel()}</div>
+            <h1 className="text-2xl font-black tracking-[-0.035em] md:text-3xl">Bom trabalho, {firstName}.</h1>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-slate-400">Acompanhe o caixa, as vendas e as cobranças do seu negócio em um só lugar.</p>
           </div>
-          <p className="mt-1 text-[11px] text-slate-400">{totalInstallments} parcela(s) em aberto</p>
-        </div>
-      </div>
-
-      <div className="card">
-        <div className="mb-3">
-          <p className="text-sm font-semibold text-slate-800">Pesquisar ficha</p>
-          <p className="mt-0.5 text-xs text-slate-500">Digite o número da ficha ou o nome do cliente.</p>
-        </div>
-        <form method="get" className="flex flex-col gap-3">
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <div className="relative min-w-0 flex-1">
-              <Search size={17} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="search"
-                name="q"
-                defaultValue={rawQuery}
-                className="input-field pl-10"
-                placeholder="Ex.: 123 ou Maria"
-                autoComplete="off"
-              />
-            </div>
-            <button type="submit" className="btn-primary sm:!w-auto sm:px-5">Pesquisar</button>
-            {(query || collaboratorFilter) && (
-              <a href="/receber" className="inline-flex h-12 items-center justify-center rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
-                Limpar
-              </a>
-            )}
-          </div>
-
-          <div className="sm:max-w-md">
-            <label htmlFor="colaborador" className="label">Filtrar por colaborador</label>
-            <CollaboratorFilterSelect
-              collaborators={(collaborators ?? []) as { id: string; name: string }[]}
-              defaultValue={collaboratorFilter}
-            />
-          </div>
-        </form>
-        {query && (
-          <p className="mt-3 text-xs text-slate-500">
-            {filteredDebtors.length} resultado(s) encontrado(s) para <span className="font-semibold text-slate-700">“{rawQuery}”</span>.
-          </p>
-        )}
-        {collaboratorFilter && (
-          <p className="mt-2 text-xs text-slate-500">
-            Filtro de colaborador ativo · {filteredDebtors.length} cliente(s) encontrado(s).
-          </p>
-        )}
-      </div>
-
-      {debtors.length === 0 ? (
-        <div className="card py-12 text-center text-sm text-slate-500">Nenhum cliente com valor em aberto.</div>
-      ) : filteredDebtors.length === 0 ? (
-        <div className="card py-12 text-center">
-          <p className="text-sm font-semibold text-slate-700">Nenhuma ficha encontrada.</p>
-          <p className="mt-1 text-xs text-slate-500">Tente pesquisar por outro número de ficha ou nome.</p>
-        </div>
-      ) : (
-        <div className="card overflow-hidden !p-0">
-          <div className="border-b border-slate-100 px-4 py-3">
-            <p className="text-sm font-semibold text-slate-800">Clientes devendo por número de ficha</p>
-            <p className="text-xs text-slate-500">Ordenados pela ficha. Clique em um cliente para ver os dados e as parcelas em aberto.</p>
-          </div>
-
-          <div className="divide-y divide-slate-100">
-            {filteredDebtors.map((debtor) => {
-              const customerName = debtor.customer?.name ?? "Cliente não informado";
-              const initial = customerName.trim().charAt(0).toUpperCase() || "?";
-
-              return (
-                <details key={debtor.key} className="group">
-                  <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-4 transition hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-slate-700">
-                      {initial}
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        {debtor.customer?.ficha_number != null && (
-                          <span className="rounded-lg bg-brand-50 px-2 py-1 text-[11px] font-bold text-brand-700">
-                            Ficha #{debtor.customer.ficha_number}
-                          </span>
-                        )}
-                        <p className="truncate text-sm font-semibold text-slate-900">{customerName}</p>
-                      </div>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {debtor.items.length} pendência(s) em aberto
-                        {debtor.overdue > 0 ? ` · ${debtor.overdue} vencida(s)` : ""}
-                      </p>
-                    </div>
-
-                    <div className="shrink-0 text-right">
-                      <p className="text-sm font-bold text-slate-900">{formatCurrency(debtor.total)}</p>
-                      <p className={`text-[11px] font-semibold ${debtor.overdue > 0 ? "text-danger" : "text-warning"}`}>
-                        {debtor.overdue > 0 ? "Possui atraso" : "A receber"}
-                      </p>
-                    </div>
-
-                    <span className="ml-1 text-xl leading-none text-slate-400 transition-transform group-open:rotate-90">›</span>
-                  </summary>
-
-                  <div className="border-t border-slate-100 bg-slate-50/70 px-4 py-4">
-                    <div className="mb-4 grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-white p-3 sm:grid-cols-4">
-                      <div>
-                        <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Ficha</p>
-                        <p className="mt-1 text-sm font-bold text-brand-700">#{debtor.customer?.ficha_number ?? "-"}</p>
-                      </div>
-                      <div>
-                        <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Cliente</p>
-                        <p className="mt-1 text-sm font-semibold text-slate-800">{customerName}</p>
-                      </div>
-                      <div>
-                        <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Telefone</p>
-                        <p className="mt-1 text-sm font-semibold text-slate-800">{phoneLabel(debtor.customer)}</p>
-                      </div>
-                      <div>
-                        <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Total devido</p>
-                        <p className="mt-1 text-sm font-bold text-slate-900">{formatCurrency(debtor.total)}</p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      {debtor.items.map(({ item, sale, open }) => (
-                        <div key={item.id} className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 sm:flex-row sm:items-center">
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-semibold text-slate-800">
-                              {sale?.is_opening_balance ? (
-                                <span className="text-amber-700">Saldo devedor inicial</span>
-                              ) : (
-                                <>
-                                  Parcela {item.installment_number}/{item.total_installments}
-                                  <span className="font-normal text-slate-400"> · Venda #{sale?.sale_number ?? "-"}</span>
-                                </>
-                              )}
-                            </p>
-                            <p className="mt-1 text-xs text-slate-500">Vencimento: {formatDate(item.due_date)}</p>
-                          </div>
-
-                          <div className="flex items-center justify-between gap-3 sm:justify-end">
-                            <div className="text-left sm:text-right">
-                              <p className="text-sm font-bold text-slate-900">{formatCurrency(open)}</p>
-                              <p className={`text-[11px] font-semibold ${item.status === "vencido" ? "text-danger" : "text-warning"}`}>
-                                {item.status === "vencido" ? "Vencida" : item.status === "parcial" ? "Parcial" : "Pendente"}
-                              </p>
-                            </div>
-                            <ReceiveButton installmentId={item.id} openAmount={open} />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </details>
-              );
-            })}
+          <div className="flex flex-wrap gap-2">
+            <Link href="/vender" className="flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-bold text-slate-950 transition hover:bg-slate-100"><Plus size={17} /> Nova venda</Link>
+            <Link href="/receber" className="flex items-center gap-2 rounded-xl bg-white/10 px-4 py-3 text-sm font-bold text-white ring-1 ring-white/15 transition hover:bg-white/15"><Banknote size={17} /> Receber</Link>
           </div>
         </div>
-      )}
+
+        <div className="relative mt-6 grid grid-cols-2 gap-3 border-t border-white/10 pt-5 lg:grid-cols-4">
+          <div><p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Faturamento</p><p className="mt-1 text-xl font-black tracking-tight">{formatCurrency(revenueMonth)}</p></div>
+          <div><p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Lucro líquido est.</p><p className={`mt-1 text-xl font-black tracking-tight ${netProfitMonth >= 0 ? "text-emerald-400" : "text-rose-400"}`}>{formatCurrency(netProfitMonth)}</p></div>
+          <div><p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">A receber</p><p className="mt-1 text-xl font-black tracking-tight text-amber-300">{formatCurrency(totalOpen)}</p></div>
+          <div><p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Vendas no mês</p><p className="mt-1 text-xl font-black tracking-tight">{(salesMonth ?? []).length}</p></div>
+        </div>
+      </section>
+
+      <section>
+        <div className="mb-3 flex items-end justify-between gap-3">
+          <div><p className="eyebrow">Visão geral</p><h2 className="mt-1 text-lg font-black tracking-tight text-slate-900">Números que importam hoje</h2></div>
+          <Link href="/relatorios" className="hidden items-center gap-1 text-xs font-bold text-brand-600 sm:flex">Ver relatórios <ArrowRight size={14} /></Link>
+        </div>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard label="Vendas hoje" value={formatCurrency(revenueToday)} icon={DollarSign} hint="Faturamento de hoje" />
+          <StatCard label="Recebido no mês" value={formatCurrency(receivedMonth)} icon={CircleDollarSign} tone="success" hint="Pagamentos registrados" />
+          <StatCard label="Clientes devendo" value={String(owingCustomerIds.size)} icon={Users} tone="warning" hint="Com saldo em aberto" />
+          <StatCard label="Estoque baixo" value={String(lowStockItems.length)} icon={PackageX} tone={lowStockItems.length > 0 ? "danger" : "default"} hint="Itens no mínimo ou abaixo" />
+        </div>
+      </section>
+
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Link href="/vender" className="group flex items-center gap-3 rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-card"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-600"><ShoppingBag size={19} /></span><div><p className="text-sm font-bold text-slate-800">Registrar venda</p><p className="text-xs text-slate-400">Nova movimentação</p></div><ArrowRight size={15} className="ml-auto text-slate-300 group-hover:text-brand-500" /></Link>
+        <Link href="/clientes/novo" className="group flex items-center gap-3 rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-card"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-violet-600"><UserPlus size={19} /></span><div><p className="text-sm font-bold text-slate-800">Novo cliente</p><p className="text-xs text-slate-400">Criar ficha</p></div><ArrowRight size={15} className="ml-auto text-slate-300 group-hover:text-violet-500" /></Link>
+        <Link href="/despesas" className="group flex items-center gap-3 rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-card"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-50 text-rose-600"><ReceiptText size={19} /></span><div><p className="text-sm font-bold text-slate-800">Lançar despesa</p><p className="text-xs text-slate-400">Controlar saída</p></div><ArrowRight size={15} className="ml-auto text-slate-300 group-hover:text-rose-500" /></Link>
+        <Link href="/financeiro" className="group flex items-center gap-3 rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-card"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600"><Wallet size={19} /></span><div><p className="text-sm font-bold text-slate-800">Financeiro</p><p className="text-xs text-slate-400">Ver fluxo de caixa</p></div><ArrowRight size={15} className="ml-auto text-slate-300 group-hover:text-emerald-500" /></Link>
+      </section>
+
+      <OverdueList items={overdueList} />
+
+      <section className="grid gap-5 lg:grid-cols-2">
+        <SimpleList title="Próximos recebimentos · 7 dias" items={upcomingList} emptyMessage="Nenhum recebimento previsto para os próximos dias." />
+        <SimpleList title="Últimas vendas" items={recentSalesList} emptyMessage="Nenhuma venda registrada ainda." />
+      </section>
+
+      <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <StatCard label="Lucro bruto" value={formatCurrency(grossProfitMonth)} icon={TrendingUp} tone="success" compact />
+        <StatCard label="Despesas do mês" value={formatCurrency(expensesMonth)} icon={ReceiptText} tone="danger" compact />
+        <StatCard label="Carteira a receber" value={formatCurrency(totalOpen)} icon={Wallet} tone="warning" compact />
+        <StatCard label="Vendas realizadas" value={String((salesMonth ?? []).length)} icon={ShoppingBag} compact />
+      </section>
     </div>
   );
 }
