@@ -187,6 +187,7 @@ export default async function ReceberPage({
             id="colaborador"
             name="colaborador"
             defaultValue={collaboratorFilter}
+            onChange={(event) => event.currentTarget.form?.requestSubmit()}
             className="input-field"
           >
             <option value="">Todos os colaboradores</option>
