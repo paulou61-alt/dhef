@@ -69,3 +69,18 @@ export function getMainNav(role: AppRole, permissions: ViewPermission[] = []): N
 export function getSecondaryNav(role: AppRole): NavItem[] {
   return role === "owner" ? OWNER_SECONDARY : [];
 }
+
+// No celular, "Colaborador" ocupa o lugar de "Estoque" na barra inferior,
+// e "Estoque" passa para o menu.
+const ESTOQUE_ITEM = OWNER_MAIN.find((item) => item.href === "/estoque")!;
+const COLABORADORES_ITEM = OWNER_SECONDARY.find((item) => item.href === "/colaboradores")!;
+
+export function getMobileMainNav(role: AppRole, permissions: ViewPermission[] = []): NavItem[] {
+  if (role !== "owner") return getMainNav(role, permissions);
+  return OWNER_MAIN.map((item) => (item === ESTOQUE_ITEM ? { ...COLABORADORES_ITEM, label: "Colaborador" } : item));
+}
+
+export function getMobileSecondaryNav(role: AppRole): NavItem[] {
+  if (role !== "owner") return [];
+  return OWNER_SECONDARY.map((item) => (item === COLABORADORES_ITEM ? ESTOQUE_ITEM : item));
+}
