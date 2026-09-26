@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Banknote, CalendarDays, Check, Eye, HandCoins, Minus, Phone, Plus, ReceiptText, ShoppingBag, X, PencilLine, Save, Trash2 } from "lucide-react";
 import { addCollaboratorValeMovement, deleteCollaboratorValeMovement, setCollaboratorValeBalance, updateCollaboratorPermissions, updateCollaboratorValeMovement } from "@/app/(app)/colaboradores/actions";
@@ -19,11 +19,13 @@ type Props = {
   collectionsTotal: number;
   valeBalance: number;
   valeMovements: ValeMovement[];
+  username?: string | null;
+  actions?: ReactNode;
 };
 
 const ROLE_LABELS: Record<Role, string> = { vendedor: "Vendedor", cobrador: "Cobrador" };
 
-export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissions, salesCount, collectionsTotal, valeBalance, valeMovements }: Props) {
+export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissions, salesCount, collectionsTotal, valeBalance, valeMovements, username, actions }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"vale" | "abatimento" | null>(null);
@@ -160,21 +162,30 @@ export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissio
   }
 
   return <>
-    <div className="flex flex-wrap items-center gap-3 px-4 py-3.5 transition hover:bg-slate-50/80">
-      <button type="button" onClick={() => setOpen(true)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-        <span className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-brand-50 text-sm font-bold text-brand-600">{collaborator.name.charAt(0).toUpperCase()}</span>
+    <div className="px-4 py-4">
+      <button type="button" onClick={() => setOpen(true)} className="flex w-full items-center gap-3 rounded-xl text-left transition hover:bg-slate-50/80">
+        <span className="flex h-11 w-11 flex-none items-center justify-center rounded-full bg-brand-50 text-base font-bold text-brand-600">{collaborator.name.charAt(0).toUpperCase()}</span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-slate-800">{collaborator.name}</p>
+          <p className="truncate text-sm font-bold text-slate-900">{collaborator.name}</p>
           <p className="truncate text-xs text-slate-500">{ROLE_LABELS[collaborator.role]}{collaborator.phone ? ` · ${collaborator.phone}` : ""}</p>
-          <p className="mt-0.5 text-[11px] font-medium text-brand-600">Clique para ver vendas, vales e permissões</p>
+          <p className="mt-0.5 text-[11px] font-medium text-brand-600">Ver vendas, vales e permissões ›</p>
+        </div>
+        <div className="flex-none text-right">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Saldo de vale</p>
+          <p className={`text-sm font-bold ${valeBalance < 0 ? "text-danger" : valeBalance > 0 ? "text-success" : "text-slate-500"}`}>{formatCurrency(valeBalance)}</p>
         </div>
       </button>
-      <div className="ml-auto text-right">
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Saldo de vale</p>
-        <p className={`text-sm font-bold ${valeBalance < 0 ? "text-danger" : valeBalance > 0 ? "text-success" : "text-slate-500"}`}>{formatCurrency(valeBalance)}</p>
-        <p className="mt-0.5 text-[10px] text-slate-400">{hasAccess ? "Acesso ao sistema ativo" : "Cadastro interno"}</p>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${hasAccess ? "bg-success/10 text-success" : "bg-slate-100 text-slate-500"}`}>
+          <span className={`h-1.5 w-1.5 rounded-full ${hasAccess ? "bg-success" : "bg-slate-400"}`} />
+          {hasAccess ? `Acesso ativo${username ? ` · ${username}` : ""}` : "Sem acesso ao sistema"}
+        </span>
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+          {actions}
+          <RemoveCollaboratorButton collaboratorId={collaborator.id} collaboratorName={collaborator.name} />
+        </div>
       </div>
-      <RemoveCollaboratorButton collaboratorId={collaborator.id} collaboratorName={collaborator.name} />
     </div>
 
     {open && <div className="fixed inset-0 z-[80] flex items-end justify-center sm:items-center sm:p-5">
