@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
-import { ALL_NAV, getSecondaryNav } from "@/lib/nav-items";
+import { ALL_NAV, getMobileSecondaryNav } from "@/lib/nav-items";
 import type { AppRole } from "@/lib/access";
 
 function getTitle(pathname: string): string {
@@ -16,7 +16,7 @@ function getTitle(pathname: string): string {
 export function Header({ role }: { role: AppRole }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const secondaryItems = getSecondaryNav(role);
+  const secondaryItems = getMobileSecondaryNav(role);
 
   useEffect(() => {
     setOpen(false);

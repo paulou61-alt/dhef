@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { clsx } from "clsx";
-import { getMainNav } from "@/lib/nav-items";
+import { getMobileMainNav } from "@/lib/nav-items";
 import type { AppRole } from "@/lib/access";
 import type { ViewPermission } from "@/lib/permissions";
 
 export function BottomNav({ role, viewPermissions = [] }: { role: AppRole; viewPermissions?: ViewPermission[] }) {
   const pathname = usePathname();
-  const items = getMainNav(role, viewPermissions);
+  const items = getMobileMainNav(role, viewPermissions);
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-2 md:hidden" aria-label="Navegação principal">
