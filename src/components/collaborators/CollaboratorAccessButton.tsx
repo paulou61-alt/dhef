@@ -97,11 +97,6 @@ export function CollaboratorAccessButton({ collaboratorId, collaboratorName, has
       <div className="flex flex-wrap items-center justify-end gap-2">
         {hasAccess ? (
           <>
-            {currentUsername && (
-              <span className="rounded-lg bg-slate-100 px-2.5 py-2 text-[11px] font-semibold text-slate-600">
-                Usuário: {currentUsername}
-              </span>
-            )}
             <button
               type="button"
               onClick={copyAccessLink}
@@ -116,7 +111,7 @@ export function CollaboratorAccessButton({ collaboratorId, collaboratorName, has
               className="inline-flex items-center gap-1.5 rounded-xl border border-brand-200 bg-brand-50 px-3 py-2 text-xs font-semibold text-brand-700 transition hover:bg-brand-100"
             >
               <KeyRound size={14} />
-              Definir nova senha
+              Nova senha
             </button>
           </>
         ) : (

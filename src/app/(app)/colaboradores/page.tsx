@@ -126,26 +126,25 @@ export default async function ColaboradoresPage() {
               const hasAccess = Boolean(collaborator.auth_user_id && collaborator.accepted_at && collaborator.is_active);
 
               return (
-                <div key={collaborator.id}>
-                  <CollaboratorProfileCard
-                    collaborator={{ id: collaborator.id, name: collaborator.name, phone: collaborator.phone, role }}
-                    hasAccess={hasAccess}
-                    viewPermissions={normalizeViewPermissions(role, collaborator.view_permissions as string[] | null)}
-                    salesCount={salesMetric.count}
-                    collectionsTotal={collectionTotals.get(collaborator.id) ?? 0}
-                    valeBalance={valeBalances.get(collaborator.id) ?? 0}
-                    valeMovements={valesByCollaborator.get(collaborator.id) ?? []}
-                  />
-
-                  <div className="flex justify-end px-4 pb-3">
+                <CollaboratorProfileCard
+                  key={collaborator.id}
+                  collaborator={{ id: collaborator.id, name: collaborator.name, phone: collaborator.phone, role }}
+                  hasAccess={hasAccess}
+                  username={collaborator.username}
+                  viewPermissions={normalizeViewPermissions(role, collaborator.view_permissions as string[] | null)}
+                  salesCount={salesMetric.count}
+                  collectionsTotal={collectionTotals.get(collaborator.id) ?? 0}
+                  valeBalance={valeBalances.get(collaborator.id) ?? 0}
+                  valeMovements={valesByCollaborator.get(collaborator.id) ?? []}
+                  actions={
                     <CollaboratorAccessButton
                       collaboratorId={collaborator.id}
                       collaboratorName={collaborator.name}
                       hasAccess={hasAccess}
                       username={collaborator.username}
                     />
-                  </div>
-                </div>
+                  }
+                />
               );
             })}
           </div>
