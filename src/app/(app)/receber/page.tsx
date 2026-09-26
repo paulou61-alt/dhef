@@ -151,7 +151,7 @@ export default async function ReceberPage({
         </div>
         <div className="text-right">
           <div className="rounded-xl bg-warning/10 px-3 py-2 text-sm font-semibold text-warning">
-            {debtors.length} cliente(s)
+            {filteredDebtors.length} cliente(s)
           </div>
           <p className="mt-1 text-[11px] text-slate-400">{totalInstallments} parcela(s) em aberto</p>
         </div>
@@ -162,41 +162,44 @@ export default async function ReceberPage({
           <p className="text-sm font-semibold text-slate-800">Pesquisar ficha</p>
           <p className="mt-0.5 text-xs text-slate-500">Digite o número da ficha ou o nome do cliente.</p>
         </div>
-        <form method="get" className="flex flex-col gap-2 sm:flex-row">
-          <div className="relative min-w-0 flex-1">
-            <Search size={17} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="search"
-              name="q"
-              defaultValue={rawQuery}
-              className="input-field pl-10"
-              placeholder="Ex.: 123 ou Maria"
-              autoComplete="off"
-            />
+        <form method="get" className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <div className="relative min-w-0 flex-1">
+              <Search size={17} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="search"
+                name="q"
+                defaultValue={rawQuery}
+                className="input-field pl-10"
+                placeholder="Ex.: 123 ou Maria"
+                autoComplete="off"
+              />
+            </div>
+            <button type="submit" className="btn-primary sm:!w-auto sm:px-5">Pesquisar</button>
+            {(query || collaboratorFilter) && (
+              <a href="/receber" className="inline-flex h-12 items-center justify-center rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
+                Limpar
+              </a>
+            )}
           </div>
-          <button type="submit" className="btn-primary sm:!w-auto sm:px-5">Pesquisar</button>
-          {query && (
-            <a href="/receber" className="inline-flex h-12 items-center justify-center rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
-              Limpar
-            </a>
-          )}
+
+          <div className="sm:max-w-md">
+            <label htmlFor="colaborador" className="label">Filtrar por colaborador</label>
+            <select
+              id="colaborador"
+              name="colaborador"
+              defaultValue={collaboratorFilter}
+              onChange={(event) => event.currentTarget.form?.requestSubmit()}
+              className="input-field"
+            >
+              <option value="">Todos os colaboradores</option>
+              <option value="sem-colaborador">Sem colaborador</option>
+              {(collaborators ?? []).map((collaborator) => (
+                <option key={collaborator.id} value={collaborator.id}>{collaborator.name}</option>
+              ))}
+            </select>
+          </div>
         </form>
-        <div className="mt-3">
-          <label htmlFor="colaborador" className="label">Filtrar por colaborador</label>
-          <select
-            id="colaborador"
-            name="colaborador"
-            defaultValue={collaboratorFilter}
-            onChange={(event) => event.currentTarget.form?.requestSubmit()}
-            className="input-field"
-          >
-            <option value="">Todos os colaboradores</option>
-            <option value="sem-colaborador">Sem colaborador</option>
-            {(collaborators ?? []).map((collaborator) => (
-              <option key={collaborator.id} value={collaborator.id}>{collaborator.name}</option>
-            ))}
-          </select>
-        </div>
         {query && (
           <p className="mt-3 text-xs text-slate-500">
             {filteredDebtors.length} resultado(s) encontrado(s) para <span className="font-semibold text-slate-700">“{rawQuery}”</span>.
