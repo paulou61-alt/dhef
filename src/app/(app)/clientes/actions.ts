@@ -260,6 +260,48 @@ export async function updateInstallmentDueDate(input: {
   return { success: true };
 }
 
+export async function updatePaymentAmount(input: {
+  paymentId: string;
+  amount: number;
+}): Promise<{ error?: string; success?: boolean }> {
+  const access = await getAccessContext();
+  if (!access || access.role !== "owner") {
+    return { error: "Apenas o proprietário pode editar recebimentos." };
+  }
+
+  const paymentId = input.paymentId?.trim();
+  const amount = Number(input.amount);
+
+  if (!paymentId) return { error: "Recebimento inválido." };
+  if (!Number.isFinite(amount) || amount <= 0) return { error: "Informe um valor maior que zero." };
+
+  const supabase = createClient();
+  const { error } = await supabase.rpc("update_payment_amount", {
+    p_payment_id: paymentId,
+    p_amount: Math.round(amount * 100) / 100,
+  });
+
+  if (error) {
+    const message = String(error.message ?? "").toLowerCase();
+    if (message.includes("maior que o valor da parcela")) {
+      return { error: "O novo valor não pode deixar o total pago maior que o valor da parcela." };
+    }
+    if (message.includes("não encontrado")) return { error: "Recebimento não encontrado." };
+    if (message.includes("maior que zero")) return { error: "Informe um valor maior que zero." };
+    return { error: "Não foi possível editar o valor do recebimento." };
+  }
+
+  revalidatePath("/clientes");
+  revalidatePath("/fichas");
+  revalidatePath("/receber");
+  revalidatePath("/cobrancas");
+  revalidatePath("/financeiro");
+  revalidatePath("/relatorios");
+  revalidatePath("/");
+
+  return { success: true };
+}
+
 export async function deleteCustomer(customerId: string): Promise<{ error?: string }> {
   const access = await getAccessContext();
   if (!access || access.role !== "owner") return { error: "Apenas o proprietário pode excluir clientes." };
