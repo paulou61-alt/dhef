@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAccessContext } from "@/lib/access";
 import { formatCurrency, formatDate, formatDateTime } from "@/utils/format";
 import { whatsappLink } from "@/utils/masks";
+import { PaymentAmountEditor } from "@/components/customers/PaymentAmountEditor";
 
 export const dynamic = "force-dynamic";
 
@@ -121,7 +122,19 @@ export default async function FichaClientePage({ params }: { params: { id: strin
                 <div className="py-3"><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Produtos</p><ul className="space-y-2">{saleItems.map((item) => <li key={item.id} className="flex items-center justify-between text-sm"><span className="text-slate-700">{item.quantity}x {item.product_name_snapshot} {item.variant_name_snapshot ? `— ${item.variant_name_snapshot}` : ""}</span><span className="font-semibold text-slate-900">{formatCurrency(Number(item.subtotal))}</span></li>)}</ul></div>
               )}
 
-              {saleInstallments.length > 0 && <div className={`${sale.is_opening_balance ? "pt-3" : "border-t border-slate-100 pt-3"}`}><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">{sale.is_opening_balance ? "Saldo e pagamentos" : "Parcelas e pagamentos"}</p><div className="space-y-2">{saleInstallments.map((inst) => <div key={inst.id} className="rounded-xl bg-white/80 p-3"><div className="flex items-center justify-between"><div><p className="text-sm font-semibold text-slate-800">{sale.is_opening_balance ? "Saldo inicial" : `Parcela ${inst.installment_number}/${inst.total_installments}`}</p><p className="text-xs text-slate-500">Vence {formatDate(inst.due_date)}</p></div><div className="text-right"><p className="text-sm font-bold">{formatCurrency(Number(inst.amount))}</p><p className="text-xs text-slate-500">Pago: {formatCurrency(Number(inst.paid_amount))}</p></div></div>{(paymentsByInstallment.get(inst.id) ?? []).map((p) => <p key={p.id} className="mt-2 border-t border-slate-200 pt-2 text-xs text-success">Recebido {formatCurrency(Number(p.amount))} em {formatDate(p.payment_date)} via {p.payment_method}</p>)}</div>)}</div></div>}
+              {saleInstallments.length > 0 && <div className={`${sale.is_opening_balance ? "pt-3" : "border-t border-slate-100 pt-3"}`}><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">{sale.is_opening_balance ? "Saldo e pagamentos" : "Parcelas e pagamentos"}</p><div className="space-y-2">{saleInstallments.map((inst) => <div key={inst.id} className="rounded-xl bg-white/80 p-3"><div className="flex items-center justify-between"><div><p className="text-sm font-semibold text-slate-800">{sale.is_opening_balance ? "Saldo inicial" : `Parcela ${inst.installment_number}/${inst.total_installments}`}</p><p className="text-xs text-slate-500">Vence {formatDate(inst.due_date)}</p></div><div className="text-right"><p className="text-sm font-bold">{formatCurrency(Number(inst.amount))}</p><p className="text-xs text-slate-500">Pago: {formatCurrency(Number(inst.paid_amount))}</p></div></div>{(paymentsByInstallment.get(inst.id) ?? []).map((p) => access.role === "owner" ? (
+  <PaymentAmountEditor
+    key={p.id}
+    paymentId={p.id}
+    amount={Number(p.amount)}
+    paymentDate={p.payment_date}
+    paymentMethod={p.payment_method}
+  />
+) : (
+  <p key={p.id} className="mt-2 border-t border-slate-200 pt-2 text-xs text-success">
+    Recebido {formatCurrency(Number(p.amount))} em {formatDate(p.payment_date)} via {p.payment_method}
+  </p>
+))}</div>)}</div></div>}
             </div>
           );
         })}
