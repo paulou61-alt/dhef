@@ -24,6 +24,7 @@ export async function registerPayment(input: {
   });
 
   if (error) {
+    if (error.message.includes("saldo total em aberto")) return { error: "O valor informado é maior que tudo o que o cliente deve." };
     if (error.message.includes("maior que o saldo")) return { error: "O valor informado é maior que o saldo da parcela." };
     return { error: "Não foi possível registrar o recebimento." };
   }
