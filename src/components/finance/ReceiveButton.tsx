@@ -17,12 +17,15 @@ export function ReceiveButton({
   buttonLabel = "Receber",
   products = [],
   variants = [],
+  successHref,
 }: {
   installmentId: string;
   openAmount: number;
   buttonLabel?: string;
   products?: PurchaseProduct[];
   variants?: PurchaseVariant[];
+  /** Endereço aberto depois de salvar. Sem ele, a página atual é recarregada. */
+  successHref?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState(String(openAmount.toFixed(2)).replace(".", ","));
@@ -84,7 +87,8 @@ export function ReceiveButton({
         if (result.synced) {
           setOpen(false);
           resetPurchase();
-          window.location.reload();
+          if (successHref) window.location.href = successHref;
+          else window.location.reload();
           return;
         }
 

@@ -58,7 +58,7 @@ export default function OfflineReceivePage() {
                           <p className="mt-1 text-xs text-slate-500">Venda #{item.sales?.sale_number ?? "-"} · Vence {formatDate(item.due_date)}</p>
                           <p className="mt-2 text-lg font-black text-slate-900">{formatCurrency(openAmount)}</p>
                         </div>
-                        <ReceiveButton installmentId={item.id} openAmount={openAmount} buttonLabel="Receber" />
+                        <ReceiveButton installmentId={item.id} openAmount={openAmount} buttonLabel="Receber" products={snapshot.products} variants={snapshot.variants} />
                       </div>
                     </article>
                   );
