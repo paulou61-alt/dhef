@@ -1,4 +1,4 @@
-import { Search } from "lucide-react";
+import { CheckCircle2, Search } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { ReceiveButton } from "@/components/finance/ReceiveButton";
 import { CollaboratorFilterSelect } from "@/components/finance/CollaboratorFilterSelect";
@@ -64,14 +64,23 @@ function normalizeSearch(value: string) {
 export default async function ReceberPage({
   searchParams,
 }: {
-  searchParams?: { q?: string; colaborador?: string };
+  searchParams?: { q?: string; colaborador?: string; aberto?: string };
 }) {
   const supabase = createClient();
-  const [{ data: installments }, { data: sales }, { data: customers }, { data: collaborators }] = await Promise.all([
+  const [
+    { data: installments },
+    { data: sales },
+    { data: customers },
+    { data: collaborators },
+    { data: products },
+    { data: variants },
+  ] = await Promise.all([
     supabase.from("installments").select("*").in("status", ["pendente", "parcial", "vencido"]).order("due_date"),
     supabase.from("sales").select("id, customer_id, sale_number, is_opening_balance"),
     supabase.from("customers").select("id, name, phone, whatsapp, ficha_number, assigned_collaborator_id"),
     supabase.from("collaborators").select("id, name").order("name"),
+    supabase.from("products").select("id, name, sale_price").eq("is_active", true).order("name"),
+    supabase.from("product_variants").select("id, product_id, variant_name, stock_quantity, sale_price").order("variant_name"),
   ]);
 
   const saleMap = new Map<string, SaleSummary>(
@@ -139,6 +148,18 @@ export default async function ReceberPage({
     return (numericQuery.length > 0 && ficha.includes(numericQuery)) || name.includes(query);
   });
 
+  // Depois de um recebimento, a ficha do cliente volta aberta no mesmo lugar.
+  const openKey = searchParams?.aberto ?? "";
+  const paidOffCustomer = openKey && !debtorMap.has(openKey) ? customerMap.get(openKey) ?? null : null;
+
+  function successHrefFor(key: string) {
+    const params = new URLSearchParams();
+    if (rawQuery) params.set("q", rawQuery);
+    if (collaboratorFilter) params.set("colaborador", collaboratorFilter);
+    params.set("aberto", key);
+    return `/receber?${params.toString()}#ficha-${key}`;
+  }
+
   const totalOpen = filteredDebtors.reduce((sum, debtor) => sum + debtor.total, 0);
   const totalInstallments = filteredDebtors.reduce((sum, debtor) => sum + debtor.items.length, 0);
 
@@ -203,6 +224,16 @@ export default async function ReceberPage({
         )}
       </div>
 
+      {paidOffCustomer && (
+        <div className="card flex items-center gap-3 border border-success/20 bg-success/5">
+          <CheckCircle2 size={20} className="flex-none text-success" />
+          <p className="text-sm text-slate-700">
+            Recebimento registrado. <span className="font-semibold">{paidOffCustomer.name}</span>
+            {paidOffCustomer.ficha_number != null ? ` (ficha #${paidOffCustomer.ficha_number})` : ""} não tem mais valores em aberto.
+          </p>
+        </div>
+      )}
+
       {debtors.length === 0 ? (
         <div className="card py-12 text-center text-sm text-slate-500">Nenhum cliente com valor em aberto.</div>
       ) : filteredDebtors.length === 0 ? (
@@ -223,7 +254,7 @@ export default async function ReceberPage({
               const initial = customerName.trim().charAt(0).toUpperCase() || "?";
 
               return (
-                <details key={debtor.key} className="group">
+                <details key={debtor.key} id={`ficha-${debtor.key}`} open={debtor.key === openKey} className="group scroll-mt-24">
                   <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-4 transition hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-slate-700">
                       {initial}
@@ -298,7 +329,13 @@ export default async function ReceberPage({
                                 {item.status === "vencido" ? "Vencida" : item.status === "parcial" ? "Parcial" : "Pendente"}
                               </p>
                             </div>
-                            <ReceiveButton installmentId={item.id} openAmount={open} />
+                            <ReceiveButton
+                              installmentId={item.id}
+                              openAmount={open}
+                              products={(products ?? []) as any}
+                              variants={(variants ?? []) as any}
+                              successHref={successHrefFor(debtor.key)}
+                            />
                           </div>
                         </div>
                       ))}
