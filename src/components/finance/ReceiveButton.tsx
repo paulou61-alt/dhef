@@ -39,6 +39,9 @@ export function ReceiveButton({
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  const parsedAmount = Number(amount.replace(",", "."));
+  const excessAmount = Number.isFinite(parsedAmount) ? Math.round((parsedAmount - openAmount) * 100) / 100 : 0;
+
   const purchaseNeedsTerms = purchasePaymentMethod === "fiado" || purchasePaymentMethod === "parcelado";
 
   function resetPurchase() {
@@ -123,6 +126,17 @@ export function ReceiveButton({
                 <div>
                   <label className="label">Valor recebido</label>
                   <input className="input-field" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
+                  {excessAmount > 0 && (
+                    purchaseItems.length > 0 ? (
+                      <p className="mt-1.5 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800">
+                        Junto com uma nova compra, o valor recebido não pode passar do saldo desta parcela ({formatCurrency(openAmount)}).
+                      </p>
+                    ) : (
+                      <p className="mt-1.5 rounded-lg bg-brand-50 px-2.5 py-1.5 text-xs text-brand-700">
+                        {formatCurrency(excessAmount)} a mais que esta parcela. A diferença será abatida automaticamente nas próximas parcelas do cliente.
+                      </p>
+                    )
+                  )}
                 </div>
                 <div>
                   <label className="label">Forma do recebimento</label>
