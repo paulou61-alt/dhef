@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AlertTriangle, Check, CheckCircle2, Clock, CreditCard, Loader2 } from "lucide-react";
 import { PLANS, lookupKey, type BillingInterval, type PlanId } from "@/lib/billing/plans";
 import { formatCurrency, formatDate } from "@/utils/format";
@@ -43,6 +44,24 @@ export function PlansView(props: Props) {
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const subscribed = props.status ? SUBSCRIBED_STATUSES.has(props.status) : false;
+  const router = useRouter();
+  const [confirmationTimedOut, setConfirmationTimedOut] = useState(false);
+  const waitingConfirmation = props.success && !subscribed && !confirmationTimedOut;
+
+  // Depois do pagamento, o Stripe avisa o sistema em alguns segundos: recarrega os dados até a assinatura aparecer.
+  useEffect(() => {
+    if (!waitingConfirmation) return;
+    let attempts = 0;
+    const timer = window.setInterval(() => {
+      attempts += 1;
+      router.refresh();
+      if (attempts >= 10) {
+        window.clearInterval(timer);
+        setConfirmationTimedOut(true);
+      }
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [waitingConfirmation, router]);
 
   async function go(key: string, path: string, body?: unknown) {
     setError(null);
@@ -66,7 +85,11 @@ export function PlansView(props: Props) {
 
       {props.success && (
         <StatusBox tone="success" icon={<CheckCircle2 size={20} />}>
-          Pagamento recebido! Sua assinatura será ativada em instantes. Se ainda aparecer como pendente, atualize a página.
+          {subscribed
+            ? "Pagamento confirmado! Sua assinatura está ativa."
+            : waitingConfirmation
+              ? "Pagamento recebido! Confirmando sua assinatura com o Stripe..."
+              : "Pagamento recebido, mas a confirmação ainda não chegou. Atualize a página em alguns minutos; se continuar assim, fale com o suporte."}
         </StatusBox>
       )}
       {props.blocked && !props.success && (
@@ -117,7 +140,7 @@ export function PlansView(props: Props) {
         </div>
       )}
 
-      {!subscribed && (
+      {!subscribed && !waitingConfirmation && (
         <>
           <div className="mx-auto flex w-fit rounded-2xl bg-slate-100 p-1.5">
             {(["mensal", "anual"] as const).map((option) => (
