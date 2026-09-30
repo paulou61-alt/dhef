@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { BrandMark } from "@/components/brand/BrandMark";
 
 const COLLABORATOR_DOMAIN = "colaborador.sacoleiro.app";
 
@@ -59,7 +60,7 @@ export default function LoginPage() {
     <div className="flex min-h-dvh flex-col justify-center px-6 py-12">
       <div className="mx-auto w-full max-w-sm">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-500 text-xl font-bold text-white">V</div>
+          <BrandMark size={48} className="mx-auto mb-4 shadow-sm" />
           <h1 className="text-2xl font-bold text-slate-900">Entrar</h1>
           <p className="mt-1 text-sm text-slate-500">Proprietário entra com e-mail; colaborador entra com usuário.</p>
         </div>

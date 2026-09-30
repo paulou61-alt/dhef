@@ -7,11 +7,12 @@ import { LogOut, Menu, X } from "lucide-react";
 import { ALL_NAV, getMobileSecondaryNav } from "@/lib/nav-items";
 import type { AppRole } from "@/lib/access";
 import { useLogout } from "@/lib/use-logout";
+import { BrandMark } from "@/components/brand/BrandMark";
 
 function getTitle(pathname: string): string {
   const all = [...ALL_NAV].sort((a, b) => b.href.length - a.href.length);
   const match = all.find((item) => item.href === "/" ? pathname === "/" : pathname.startsWith(item.href));
-  return match?.label ?? "Controle de Vendas";
+  return match?.label ?? "Cobrei";
 }
 
 export function Header({ role }: { role: AppRole }) {
@@ -29,9 +30,9 @@ export function Header({ role }: { role: AppRole }) {
       <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/85 px-4 py-3 backdrop-blur-xl md:hidden">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-9 w-9 flex-none items-center justify-center rounded-xl bg-slate-950 text-sm font-black text-white shadow-sm">V</div>
+            <BrandMark size={36} className="shadow-sm" />
             <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Controle de Vendas</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Cobrei</p>
               <h1 className="truncate text-[16px] font-bold tracking-tight text-slate-900">{getTitle(pathname)}</h1>
             </div>
           </div>

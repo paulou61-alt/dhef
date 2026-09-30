@@ -273,7 +273,7 @@ export async function getMonthlyBusinessReport(monthValue?: string | null) {
     monthLabel,
     generatedAt: new Date().toISOString(),
     business: {
-      name: profile?.business_name || profile?.full_name || "Controle de Vendas",
+      name: profile?.business_name || profile?.full_name || "Cobrei",
       ownerName: profile?.full_name ?? "Proprietário",
       phone: profile?.phone ?? null,
     },
