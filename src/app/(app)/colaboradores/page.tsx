@@ -5,6 +5,8 @@ import { getAccessContext } from "@/lib/access";
 import { CollaboratorForm } from "@/components/collaborators/CollaboratorForm";
 import { CollaboratorProfileCard } from "@/components/collaborators/CollaboratorProfileCard";
 import { CollaboratorAccessButton } from "@/components/collaborators/CollaboratorAccessButton";
+import { CollaboratorSearchList } from "@/components/collaborators/CollaboratorSearchList";
+import { EditCollaboratorButton } from "@/components/collaborators/EditCollaboratorButton";
 import { normalizeViewPermissions } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
@@ -119,35 +121,44 @@ export default async function ColaboradoresPage() {
             <p className="text-sm text-slate-500">Nenhum colaborador cadastrado.</p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-100">
-            {collaborators.map((collaborator) => {
+          <CollaboratorSearchList
+            items={collaborators.map((collaborator) => {
               const role = collaborator.role as "vendedor" | "cobrador";
               const salesMetric = salesTotals.get(collaborator.id) ?? { total: 0, count: 0 };
               const hasAccess = Boolean(collaborator.auth_user_id && collaborator.accepted_at && collaborator.is_active);
+              const editable = { id: collaborator.id, name: collaborator.name, phone: collaborator.phone, role };
 
-              return (
-                <CollaboratorProfileCard
-                  key={collaborator.id}
-                  collaborator={{ id: collaborator.id, name: collaborator.name, phone: collaborator.phone, role }}
-                  hasAccess={hasAccess}
-                  username={collaborator.username}
-                  viewPermissions={normalizeViewPermissions(role, collaborator.view_permissions as string[] | null)}
-                  salesCount={salesMetric.count}
-                  collectionsTotal={collectionTotals.get(collaborator.id) ?? 0}
-                  valeBalance={valeBalances.get(collaborator.id) ?? 0}
-                  valeMovements={valesByCollaborator.get(collaborator.id) ?? []}
-                  actions={
-                    <CollaboratorAccessButton
-                      collaboratorId={collaborator.id}
-                      collaboratorName={collaborator.name}
-                      hasAccess={hasAccess}
-                      username={collaborator.username}
-                    />
-                  }
-                />
-              );
+              return {
+                id: collaborator.id,
+                name: collaborator.name,
+                content: (
+                  <CollaboratorProfileCard
+                    // A chave inclui a função para recarregar as permissões quando ela muda.
+                    key={`${collaborator.id}-${role}`}
+                    collaborator={editable}
+                    hasAccess={hasAccess}
+                    username={collaborator.username}
+                    viewPermissions={normalizeViewPermissions(role, collaborator.view_permissions as string[] | null)}
+                    salesCount={salesMetric.count}
+                    collectionsTotal={collectionTotals.get(collaborator.id) ?? 0}
+                    valeBalance={valeBalances.get(collaborator.id) ?? 0}
+                    valeMovements={valesByCollaborator.get(collaborator.id) ?? []}
+                    actions={
+                      <>
+                        <EditCollaboratorButton collaborator={editable} />
+                        <CollaboratorAccessButton
+                          collaboratorId={collaborator.id}
+                          collaboratorName={collaborator.name}
+                          hasAccess={hasAccess}
+                          username={collaborator.username}
+                        />
+                      </>
+                    }
+                  />
+                ),
+              };
             })}
-          </div>
+          />
         )}
       </div>
     </div>

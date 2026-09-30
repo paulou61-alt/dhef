@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "@/lib/supabase/config";
 import { getAccessContext } from "@/lib/access";
-import { normalizeViewPermissions, type ViewPermission } from "@/lib/permissions";
+import { getDefaultViewPermissions, normalizeViewPermissions, type ViewPermission } from "@/lib/permissions";
 
 export interface CreateCollaboratorInput {
   name: string;
@@ -154,6 +154,54 @@ export async function setCollaboratorPassword(
   if (!result.ok) return { error: result.error || "Não foi possível definir a nova senha." };
 
   revalidatePath("/colaboradores");
+  return { success: true };
+}
+
+export async function updateCollaborator(input: {
+  collaboratorId: string;
+  name: string;
+  phone?: string;
+  role: "vendedor" | "cobrador";
+}): Promise<{ error?: string; success?: boolean }> {
+  const access = await getAccessContext();
+  if (!access || access.role !== "owner") {
+    return { error: "Apenas o proprietário pode editar colaboradores." };
+  }
+
+  const name = input.name.trim();
+  if (!name) return { error: "Informe o nome do colaborador." };
+  if (input.role !== "vendedor" && input.role !== "cobrador") return { error: "Função inválida." };
+
+  const supabase = createClient();
+  const { data: collaborator } = await supabase
+    .from("collaborators")
+    .select("role, view_permissions")
+    .eq("id", input.collaboratorId)
+    .eq("owner_id", access.ownerId)
+    .maybeSingle();
+
+  if (!collaborator) return { error: "Colaborador não encontrado." };
+
+  const update: Record<string, unknown> = { name, phone: input.phone?.trim() || null };
+
+  // Ao trocar a função, mantém as visualizações que continuam válidas; se nenhuma sobrar, usa o padrão da nova função.
+  if (collaborator.role !== input.role) {
+    const kept = normalizeViewPermissions(input.role, collaborator.view_permissions as string[] | null);
+    update.role = input.role;
+    update.view_permissions = kept.length > 0 ? kept : getDefaultViewPermissions(input.role);
+  }
+
+  const { error } = await supabase
+    .from("collaborators")
+    .update(update)
+    .eq("id", input.collaboratorId)
+    .eq("owner_id", access.ownerId);
+
+  if (error) return { error: "Não foi possível salvar os dados do colaborador." };
+
+  revalidatePath("/colaboradores");
+  revalidatePath("/fichas");
+  revalidatePath("/clientes");
   return { success: true };
 }
 
