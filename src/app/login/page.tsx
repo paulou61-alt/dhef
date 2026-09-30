@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { ResendConfirmation } from "@/components/auth/ResendConfirmation";
 import { BrandMark } from "@/components/brand/BrandMark";
 
 const COLLABORATOR_DOMAIN = "colaborador.sacoleiro.app";
@@ -16,10 +17,12 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [unconfirmedEmail, setUnconfirmedEmail] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setUnconfirmedEmail(null);
     setLoading(true);
 
     const normalized = login.trim().toLowerCase();
@@ -28,7 +31,12 @@ export default function LoginPage() {
 
     if (error) {
       setLoading(false);
-      setError(error.message === "Invalid login credentials" ? "Usuário/e-mail ou senha incorretos." : "Não foi possível entrar. Tente novamente.");
+      if (error.message.toLowerCase().includes("email not confirmed")) {
+        setError("Seu e-mail ainda não foi confirmado. Abra o link que enviamos no cadastro.");
+        setUnconfirmedEmail(email);
+      } else {
+        setError(error.message === "Invalid login credentials" ? "Usuário/e-mail ou senha incorretos." : "Não foi possível entrar. Tente novamente.");
+      }
       return;
     }
 
@@ -88,6 +96,7 @@ export default function LoginPage() {
             <input id="password" type="password" autoComplete="current-password" required className="input-field" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} />
           </div>
           {error && <p className="rounded-xl bg-danger/10 px-4 py-3 text-sm text-danger">{error}</p>}
+          {unconfirmedEmail && <ResendConfirmation email={unconfirmedEmail} />}
           <button type="submit" className="btn-primary w-full" disabled={loading}>{loading ? "Entrando..." : "Entrar"}</button>
         </form>
 
