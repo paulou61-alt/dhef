@@ -18,8 +18,21 @@ async function findOwnerId(admin: Admin, subscription: Stripe.Subscription) {
   return data?.owner_id ?? null;
 }
 
+/**
+ * Status que o Cobrei usa para liberar o acesso. Assinaturas por fatura (Pix) nascem "active" no Stripe
+ * mesmo antes do primeiro pagamento; enquanto a primeira fatura não for paga, tratamos como "incomplete".
+ */
+async function effectiveStatus(stripe: Stripe, subscription: Stripe.Subscription) {
+  if (subscription.collection_method !== "send_invoice" || subscription.status !== "active") return subscription.status;
+  const invoiceId = typeof subscription.latest_invoice === "string" ? subscription.latest_invoice : subscription.latest_invoice?.id;
+  if (!invoiceId) return subscription.status;
+  const invoice = await stripe.invoices.retrieve(invoiceId);
+  const firstInvoiceUnpaid = invoice.billing_reason === "subscription_create" && invoice.status !== "paid" && invoice.amount_due > 0;
+  return firstInvoiceUnpaid ? "incomplete" : subscription.status;
+}
+
 // Copia o estado da assinatura do Stripe para a tabela public.subscriptions.
-async function syncSubscription(admin: Admin, subscription: Stripe.Subscription, ownerIdHint?: string | null) {
+async function syncSubscription(stripe: Stripe, admin: Admin, subscription: Stripe.Subscription, ownerIdHint?: string | null) {
   const ownerId = ownerIdHint || (await findOwnerId(admin, subscription));
   if (!ownerId) return;
 
@@ -33,7 +46,7 @@ async function syncSubscription(admin: Admin, subscription: Stripe.Subscription,
   await admin.from("subscriptions").upsert(
     {
       owner_id: ownerId,
-      status: subscription.status,
+      status: await effectiveStatus(stripe, subscription),
       plan: parsed?.plan ?? null,
       billing_interval: parsed?.interval ?? null,
       current_period_end: toIso(periodEnd),
@@ -68,7 +81,7 @@ export async function POST(request: Request) {
       if (session.mode === "subscription" && session.subscription) {
         const subscriptionId = typeof session.subscription === "string" ? session.subscription : session.subscription.id;
         const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-        await syncSubscription(admin, subscription, session.client_reference_id);
+        await syncSubscription(stripe, admin, subscription, session.client_reference_id);
       }
       break;
     }
@@ -76,8 +89,19 @@ export async function POST(request: Request) {
     case "customer.subscription.updated":
     case "customer.subscription.paused":
     case "customer.subscription.resumed":
-      await syncSubscription(admin, event.data.object);
+      await syncSubscription(stripe, admin, event.data.object);
       break;
+    case "invoice.paid": {
+      // Fatura paga (ex.: Pix): atualiza a assinatura para liberar o acesso.
+      const invoice = event.data.object as Stripe.Invoice & {
+        subscription?: string | Stripe.Subscription | null;
+        parent?: { subscription_details?: { subscription?: string | Stripe.Subscription | null } | null } | null;
+      };
+      const ref = invoice.subscription ?? invoice.parent?.subscription_details?.subscription ?? null;
+      const subscriptionId = typeof ref === "string" ? ref : ref?.id;
+      if (subscriptionId) await syncSubscription(stripe, admin, await stripe.subscriptions.retrieve(subscriptionId));
+      break;
+    }
     case "customer.subscription.deleted": {
       // Só encerra se for a assinatura atual da empresa (ignora assinaturas antigas).
       const subscription = event.data.object;

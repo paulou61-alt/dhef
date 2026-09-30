@@ -88,7 +88,9 @@ export function planSummary(subscription: Subscription | null): { label: string;
       return { label: "Teste grátis", hint: `${days === 1 ? "Falta 1 dia" : `Faltam ${days} dias`} · Assinar`, tone: days <= 2 ? "warning" : "brand" };
     }
     case "past_due":
-      return { label: "Pagamento pendente", hint: "Atualize a forma de pagamento", tone: "warning" };
+      return { label: "Pagamento pendente", hint: "Pague a fatura em aberto", tone: "warning" };
+    case "incomplete":
+      return { label: "Aguardando pagamento", hint: "Pague o Pix para ativar", tone: "warning" };
     case "active":
     case "trialing": {
       const end = date(subscription.current_period_end);
