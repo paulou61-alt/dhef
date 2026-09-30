@@ -15,6 +15,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { getAccessContext } from "@/lib/access";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { OverdueList, type OverdueItem } from "@/components/dashboard/OverdueList";
@@ -64,17 +65,27 @@ export default async function DashboardPage() {
     { data: monthExpenses },
     { data: monthPayments },
   ] = await Promise.all([
-    supabase.from("sales").select("total").eq("status", "completed").eq("is_opening_balance", false).gte("created_at", today),
-    supabase
-      .from("sales")
-      .select("id, total, sale_items(quantity, unit_cost_snapshot, unit_price_snapshot)")
-      .eq("status", "completed")
-      .eq("is_opening_balance", false)
-      .gte("created_at", monthStart),
-    supabase
-      .from("installments")
-      .select("id, amount, paid_amount, sale_id, sales!inner(customer_id)")
-      .in("status", ["pendente", "parcial", "vencido"]),
+    fetchAll((from, to) =>
+      supabase.from("sales").select("total").eq("status", "completed").eq("is_opening_balance", false).gte("created_at", today).order("id").range(from, to)
+    ),
+    fetchAll((from, to) =>
+      supabase
+        .from("sales")
+        .select("id, total, sale_items(quantity, unit_cost_snapshot, unit_price_snapshot)")
+        .eq("status", "completed")
+        .eq("is_opening_balance", false)
+        .gte("created_at", monthStart)
+        .order("id")
+        .range(from, to)
+    ),
+    fetchAll((from, to) =>
+      supabase
+        .from("installments")
+        .select("id, amount, paid_amount, sale_id, sales!inner(customer_id)")
+        .in("status", ["pendente", "parcial", "vencido"])
+        .order("id")
+        .range(from, to)
+    ),
     supabase
       .from("installments")
       .select("id, amount, paid_amount, due_date, sales!inner(customer_id, customers(name, phone, whatsapp))")
@@ -102,8 +113,12 @@ export default async function DashboardPage() {
       .select("id, variant_name, stock_quantity, min_stock, products(name)")
       .order("stock_quantity", { ascending: true })
       .limit(100),
-    supabase.from("expenses").select("amount").gte("expense_date", monthStart.slice(0, 10)),
-    supabase.from("payments").select("amount").gte("payment_date", monthStart.slice(0, 10)),
+    fetchAll((from, to) =>
+      supabase.from("expenses").select("amount").gte("expense_date", monthStart.slice(0, 10)).order("id").range(from, to)
+    ),
+    fetchAll((from, to) =>
+      supabase.from("payments").select("amount").gte("payment_date", monthStart.slice(0, 10)).order("id").range(from, to)
+    ),
   ]);
 
   const revenueToday = (salesToday ?? []).reduce((sum, s) => sum + Number(s.total), 0);

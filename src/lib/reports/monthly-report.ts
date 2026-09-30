@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import { chunk, fetchAll } from "@/lib/supabase/fetch-all";
 import { getAccessContext } from "@/lib/access";
 
 const OPEN_INSTALLMENT_STATUSES = new Set(["pendente", "parcial", "vencido"]);
@@ -43,16 +44,63 @@ export async function getMonthlyBusinessReport(monthValue?: string | null) {
     { data: monthCashMovements },
   ] = await Promise.all([
     supabase.from("profiles").select("full_name, business_name, phone").eq("id", access.ownerId).maybeSingle(),
-    supabase.from("sales").select("id, customer_id, sale_number, status, payment_method, total, down_payment, is_paid, is_opening_balance, created_at, created_by_collaborator_id").neq("status", "cancelled").order("created_at"),
-    supabase.from("customers").select("id, name, ficha_number, phone, city, state").order("name"),
-    supabase.from("expenses").select("id, description, category, amount, expense_date, notes").gte("expense_date", monthStart).lt("expense_date", nextMonth).order("expense_date"),
-    supabase.from("payments").select("id, installment_id, amount, payment_method, payment_date, notes, collected_by_collaborator_id").gte("payment_date", monthStart).lt("payment_date", nextMonth).order("payment_date"),
-    supabase.from("installments").select("id, sale_id, installment_number, total_installments, amount, paid_amount, due_date, status").order("due_date"),
-    supabase.from("products").select("id, name, category, brand, cost_price, sale_price, is_active").order("name"),
-    supabase.from("product_variants").select("id, product_id, variant_name, stock_quantity, cost_price, sale_price").order("variant_name"),
+    fetchAll((from, to) =>
+      supabase
+        .from("sales")
+        .select("id, customer_id, sale_number, status, payment_method, total, down_payment, is_paid, is_opening_balance, created_at, created_by_collaborator_id")
+        .neq("status", "cancelled")
+        .order("created_at")
+        .order("id")
+        .range(from, to)
+    ),
+    fetchAll((from, to) => supabase.from("customers").select("id, name, ficha_number, phone, city, state").order("name").order("id").range(from, to)),
+    fetchAll((from, to) =>
+      supabase
+        .from("expenses")
+        .select("id, description, category, amount, expense_date, notes")
+        .gte("expense_date", monthStart)
+        .lt("expense_date", nextMonth)
+        .order("expense_date")
+        .order("id")
+        .range(from, to)
+    ),
+    fetchAll((from, to) =>
+      supabase
+        .from("payments")
+        .select("id, installment_id, amount, payment_method, payment_date, notes, collected_by_collaborator_id")
+        .gte("payment_date", monthStart)
+        .lt("payment_date", nextMonth)
+        .order("payment_date")
+        .order("id")
+        .range(from, to)
+    ),
+    fetchAll((from, to) =>
+      supabase
+        .from("installments")
+        .select("id, sale_id, installment_number, total_installments, amount, paid_amount, due_date, status")
+        .order("due_date")
+        .order("id")
+        .range(from, to)
+    ),
+    fetchAll((from, to) =>
+      supabase.from("products").select("id, name, category, brand, cost_price, sale_price, is_active").order("name").order("id").range(from, to)
+    ),
+    fetchAll((from, to) =>
+      supabase.from("product_variants").select("id, product_id, variant_name, stock_quantity, cost_price, sale_price").order("variant_name").order("id").range(from, to)
+    ),
     supabase.from("collaborators").select("id, name, role, is_active").eq("is_active", true).order("name"),
-    supabase.from("collaborator_vale_movements").select("collaborator_id, movement_type, amount, movement_date"),
-    supabase.from("cash_movements").select("type, origin, amount, created_at").gte("created_at", monthStartTs).lt("created_at", nextMonthTs),
+    fetchAll((from, to) =>
+      supabase.from("collaborator_vale_movements").select("collaborator_id, movement_type, amount, movement_date").order("id").range(from, to)
+    ),
+    fetchAll((from, to) =>
+      supabase
+        .from("cash_movements")
+        .select("type, origin, amount, created_at")
+        .gte("created_at", monthStartTs)
+        .lt("created_at", nextMonthTs)
+        .order("id")
+        .range(from, to)
+    ),
   ]);
 
   const completedEntries = (allSales ?? []).filter((sale) => sale.status === "completed");
@@ -60,12 +108,20 @@ export async function getMonthlyBusinessReport(monthValue?: string | null) {
   const monthSales = completedSales.filter((sale) => String(sale.created_at).slice(0, 7) === monthKey);
   const monthSaleIds = monthSales.map((sale) => sale.id);
 
-  const { data: monthItems } = monthSaleIds.length
-    ? await supabase
-        .from("sale_items")
-        .select("sale_id, product_name_snapshot, variant_name_snapshot, quantity, unit_cost_snapshot, unit_price_snapshot, subtotal")
-        .in("sale_id", monthSaleIds)
-    : { data: [] as any[] };
+  // Busca os itens em blocos de vendas para a URL da consulta não ficar grande demais.
+  const itemPages = await Promise.all(
+    chunk(monthSaleIds).map((saleIds) =>
+      fetchAll((from, to) =>
+        supabase
+          .from("sale_items")
+          .select("sale_id, product_name_snapshot, variant_name_snapshot, quantity, unit_cost_snapshot, unit_price_snapshot, subtotal")
+          .in("sale_id", saleIds)
+          .order("id")
+          .range(from, to)
+      )
+    )
+  );
+  const monthItems = itemPages.flatMap((page) => page.data);
 
   const customerMap = new Map((customers ?? []).map((customer) => [customer.id, customer]));
   const saleMap = new Map(completedEntries.map((sale) => [sale.id, sale]));

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { UserRoundCog } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { getAccessContext } from "@/lib/access";
 import { CollaboratorForm } from "@/components/collaborators/CollaboratorForm";
 import { CollaboratorProfileCard } from "@/components/collaborators/CollaboratorProfileCard";
@@ -34,24 +35,30 @@ export default async function ColaboradoresPage() {
       .eq("owner_id", access.ownerId)
       .eq("is_active", true)
       .order("name"),
-    supabase
-      .from("customers")
-      .select("id, assigned_collaborator_id")
-      .eq("user_id", access.ownerId),
-    supabase
-      .from("sales")
-      .select("created_by_collaborator_id, customer_id, total, status, is_opening_balance")
-      .eq("user_id", access.ownerId),
-    supabase
-      .from("payments")
-      .select("collected_by_collaborator_id, amount")
-      .eq("user_id", access.ownerId),
-    supabase
-      .from("collaborator_vale_movements")
-      .select("id, collaborator_id, movement_type, amount, movement_date, notes, created_at")
-      .eq("owner_id", access.ownerId)
-      .order("movement_date", { ascending: false })
-      .order("created_at", { ascending: false }),
+    fetchAll((from, to) =>
+      supabase.from("customers").select("id, assigned_collaborator_id").eq("user_id", access.ownerId).order("id").range(from, to)
+    ),
+    fetchAll((from, to) =>
+      supabase
+        .from("sales")
+        .select("created_by_collaborator_id, customer_id, total, status, is_opening_balance")
+        .eq("user_id", access.ownerId)
+        .order("id")
+        .range(from, to)
+    ),
+    fetchAll((from, to) =>
+      supabase.from("payments").select("collected_by_collaborator_id, amount").eq("user_id", access.ownerId).order("id").range(from, to)
+    ),
+    fetchAll((from, to) =>
+      supabase
+        .from("collaborator_vale_movements")
+        .select("id, collaborator_id, movement_type, amount, movement_date, notes, created_at")
+        .eq("owner_id", access.ownerId)
+        .order("movement_date", { ascending: false })
+        .order("created_at", { ascending: false })
+        .order("id")
+        .range(from, to)
+    ),
   ]);
 
   const collaborators = collaboratorsResult.data ?? [];
