@@ -17,8 +17,12 @@ export interface PurchaseContext {
   admin: NonNullable<ReturnType<typeof getSupabaseAdmin>>;
   price: Stripe.Price;
   customerId: string;
-  /** Fim do teste grátis em segundos (Unix), quando ainda dá para mantê-lo. */
+  /** Fim do teste grátis ou do período já pago no Pix, em segundos (Unix), quando ainda dá para mantê-lo. */
   trialEnd: number | null;
+  plan: PlanId;
+  interval: BillingInterval;
+  /** Até quando a empresa já tem acesso garantido (teste grátis ou Pix pago), em milissegundos. */
+  paidUntilMs: number;
 }
 
 /**
@@ -41,7 +45,7 @@ export async function preparePurchase(access: AccessContext, body: unknown): Pro
 
   const { data: subscription } = await admin
     .from("subscriptions")
-    .select("status, trial_ends_at, stripe_customer_id, stripe_subscription_id")
+    .select("status, trial_ends_at, current_period_end, stripe_customer_id, stripe_subscription_id")
     .eq("owner_id", access.ownerId)
     .maybeSingle();
 
@@ -49,7 +53,7 @@ export async function preparePurchase(access: AccessContext, body: unknown): Pro
     return NextResponse.json({ error: "Você já tem uma assinatura. Use \"Gerenciar assinatura\" para trocar de plano." }, { status: 409 });
   }
 
-  // Tentativa anterior de Pix ainda não paga: cancela para não gerar duas assinaturas.
+  // Assinatura anterior que nunca chegou a ser paga: cancela para não gerar duas assinaturas.
   if (subscription?.stripe_subscription_id && subscription.status === "incomplete") {
     await stripe.subscriptions.cancel(subscription.stripe_subscription_id).catch(() => undefined);
   }
@@ -77,11 +81,12 @@ export async function preparePurchase(access: AccessContext, body: unknown): Pro
       .upsert({ owner_id: access.ownerId, stripe_customer_id: customerId }, { onConflict: "owner_id" });
   }
 
-  // Quem assina durante o teste grátis só começa a pagar quando o teste acabar.
-  const trialEndMs = subscription?.status === "trial" && subscription.trial_ends_at
-    ? new Date(subscription.trial_ends_at).getTime()
-    : 0;
-  const trialEnd = trialEndMs - Date.now() > MIN_TRIAL_MS ? Math.floor(trialEndMs / 1000) : null;
+  // Quem assina durante o teste grátis (ou com Pix ainda pago) só começa a pagar quando esse período acabar.
+  const paidUntilMs = Math.max(
+    subscription?.status === "trial" && subscription.trial_ends_at ? new Date(subscription.trial_ends_at).getTime() : 0,
+    subscription?.status === "pix" && subscription.current_period_end ? new Date(subscription.current_period_end).getTime() : 0
+  );
+  const trialEnd = paidUntilMs - Date.now() > MIN_TRIAL_MS ? Math.floor(paidUntilMs / 1000) : null;
 
-  return { stripe, admin, price, customerId, trialEnd };
+  return { stripe, admin, price, customerId, trialEnd, plan: plan as PlanId, interval: interval as BillingInterval, paidUntilMs };
 }

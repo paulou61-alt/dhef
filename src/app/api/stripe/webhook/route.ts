@@ -18,21 +18,8 @@ async function findOwnerId(admin: Admin, subscription: Stripe.Subscription) {
   return data?.owner_id ?? null;
 }
 
-/**
- * Status que o Cobrei usa para liberar o acesso. Assinaturas por fatura (Pix) nascem "active" no Stripe
- * mesmo antes do primeiro pagamento; enquanto a primeira fatura não for paga, tratamos como "incomplete".
- */
-async function effectiveStatus(stripe: Stripe, subscription: Stripe.Subscription) {
-  if (subscription.collection_method !== "send_invoice" || subscription.status !== "active") return subscription.status;
-  const invoiceId = typeof subscription.latest_invoice === "string" ? subscription.latest_invoice : subscription.latest_invoice?.id;
-  if (!invoiceId) return subscription.status;
-  const invoice = await stripe.invoices.retrieve(invoiceId);
-  const firstInvoiceUnpaid = invoice.billing_reason === "subscription_create" && invoice.status !== "paid" && invoice.amount_due > 0;
-  return firstInvoiceUnpaid ? "incomplete" : subscription.status;
-}
-
 // Copia o estado da assinatura do Stripe para a tabela public.subscriptions.
-async function syncSubscription(stripe: Stripe, admin: Admin, subscription: Stripe.Subscription, ownerIdHint?: string | null) {
+async function syncSubscription(admin: Admin, subscription: Stripe.Subscription, ownerIdHint?: string | null) {
   const ownerId = ownerIdHint || (await findOwnerId(admin, subscription));
   if (!ownerId) return;
 
@@ -46,13 +33,46 @@ async function syncSubscription(stripe: Stripe, admin: Admin, subscription: Stri
   await admin.from("subscriptions").upsert(
     {
       owner_id: ownerId,
-      status: await effectiveStatus(stripe, subscription),
+      status: subscription.status,
       plan: parsed?.plan ?? null,
       billing_interval: parsed?.interval ?? null,
       current_period_end: toIso(periodEnd),
       cancel_at_period_end: subscription.cancel_at_period_end,
       stripe_customer_id: customerId,
       stripe_subscription_id: subscription.id,
+    },
+    { onConflict: "owner_id" }
+  );
+}
+
+/**
+ * Pagamento avulso do Pix confirmado: libera o plano até a data calculada na criação do pagamento.
+ * Usa a data guardada no pagamento (e não "agora + 1 mês"), então receber o mesmo aviso duas vezes não soma dias a mais.
+ */
+async function applyPixPayment(admin: Admin, session: Stripe.Checkout.Session) {
+  const meta = session.metadata ?? {};
+  if (meta.kind !== "cobrei_pix" || session.payment_status !== "paid" || !meta.owner_id || !meta.period_end) return;
+
+  const { data: current } = await admin
+    .from("subscriptions")
+    .select("status, current_period_end")
+    .eq("owner_id", meta.owner_id)
+    .maybeSingle();
+
+  const paidUntil = new Date(meta.period_end).getTime();
+  const currentEnd = current?.status === "pix" && current.current_period_end ? new Date(current.current_period_end).getTime() : 0;
+  const customerId = typeof session.customer === "string" ? session.customer : session.customer?.id ?? null;
+
+  await admin.from("subscriptions").upsert(
+    {
+      owner_id: meta.owner_id,
+      status: "pix",
+      plan: meta.plan ?? null,
+      billing_interval: meta.interval ?? null,
+      current_period_end: new Date(Math.max(paidUntil, currentEnd)).toISOString(),
+      cancel_at_period_end: false,
+      trial_ends_at: null,
+      ...(customerId ? { stripe_customer_id: customerId } : {}),
     },
     { onConflict: "owner_id" }
   );
@@ -76,12 +96,16 @@ export async function POST(request: Request) {
   }
 
   switch (event.type) {
+    case "checkout.session.async_payment_succeeded":
+      await applyPixPayment(admin, event.data.object);
+      break;
     case "checkout.session.completed": {
       const session = event.data.object;
+      if (session.mode === "payment") await applyPixPayment(admin, session);
       if (session.mode === "subscription" && session.subscription) {
         const subscriptionId = typeof session.subscription === "string" ? session.subscription : session.subscription.id;
         const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-        await syncSubscription(stripe, admin, subscription, session.client_reference_id);
+        await syncSubscription(admin, subscription, session.client_reference_id);
       }
       break;
     }
@@ -89,7 +113,7 @@ export async function POST(request: Request) {
     case "customer.subscription.updated":
     case "customer.subscription.paused":
     case "customer.subscription.resumed":
-      await syncSubscription(stripe, admin, event.data.object);
+      await syncSubscription(admin, event.data.object);
       break;
     case "invoice.paid": {
       // Fatura paga (ex.: Pix): atualiza a assinatura para liberar o acesso.
@@ -99,7 +123,7 @@ export async function POST(request: Request) {
       };
       const ref = invoice.subscription ?? invoice.parent?.subscription_details?.subscription ?? null;
       const subscriptionId = typeof ref === "string" ? ref : ref?.id;
-      if (subscriptionId) await syncSubscription(stripe, admin, await stripe.subscriptions.retrieve(subscriptionId));
+      if (subscriptionId) await syncSubscription(admin, await stripe.subscriptions.retrieve(subscriptionId));
       break;
     }
     case "customer.subscription.deleted": {

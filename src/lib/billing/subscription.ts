@@ -45,12 +45,23 @@ export function hasAccess(subscription: Subscription | null) {
   if (subscription.status === "trial") {
     return Boolean(subscription.trial_ends_at && new Date(subscription.trial_ends_at).getTime() > Date.now());
   }
+  // Plano pré-pago no Pix: vale até a data paga.
+  if (subscription.status === "pix") {
+    return Boolean(subscription.current_period_end && new Date(subscription.current_period_end).getTime() > Date.now());
+  }
   return ACTIVE_STRIPE_STATUSES.has(subscription.status);
 }
 
 export function trialDaysLeft(subscription: Subscription | null) {
   if (subscription?.status !== "trial" || !subscription.trial_ends_at) return null;
   const ms = new Date(subscription.trial_ends_at).getTime() - Date.now();
+  return Math.max(0, Math.ceil(ms / (24 * 60 * 60 * 1000)));
+}
+
+/** Dias até vencer o plano pago no Pix (null se a empresa não está no Pix). */
+export function pixDaysLeft(subscription: Subscription | null) {
+  if (subscription?.status !== "pix" || !subscription.current_period_end) return null;
+  const ms = new Date(subscription.current_period_end).getTime() - Date.now();
   return Math.max(0, Math.ceil(ms / (24 * 60 * 60 * 1000)));
 }
 
@@ -90,7 +101,15 @@ export function planSummary(subscription: Subscription | null): { label: string;
     case "past_due":
       return { label: "Pagamento pendente", hint: "Pague a fatura em aberto", tone: "warning" };
     case "incomplete":
-      return { label: "Aguardando pagamento", hint: "Pague o Pix para ativar", tone: "warning" };
+      return { label: "Aguardando pagamento", hint: "Conclua o pagamento para ativar", tone: "warning" };
+    case "pix": {
+      const days = pixDaysLeft(subscription) ?? 0;
+      return {
+        label: `Plano ${name ?? "ativo"} · Pix`,
+        hint: days <= 5 ? `${days === 1 ? "Vence em 1 dia" : `Vence em ${days} dias`} · Renovar` : `Pago até ${date(subscription.current_period_end)}`,
+        tone: days <= 5 ? "warning" : "brand",
+      };
+    }
     case "active":
     case "trialing": {
       const end = date(subscription.current_period_end);

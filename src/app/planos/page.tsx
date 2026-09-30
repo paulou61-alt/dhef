@@ -24,7 +24,7 @@ async function loadPrices(): Promise<Record<string, number>> {
   }
 }
 
-export default async function PlanosPage({ searchParams }: { searchParams: { sucesso?: string; pix?: string } }) {
+export default async function PlanosPage({ searchParams }: { searchParams: { sucesso?: string } }) {
   const access = await getAccessContext();
   if (!access) redirect("/login");
 
@@ -67,7 +67,6 @@ export default async function PlanosPage({ searchParams }: { searchParams: { suc
             hasCustomer={Boolean(subscription?.stripe_customer_id)}
             blocked={blocked}
             success={searchParams.sucesso === "1"}
-            pixScheduled={searchParams.pix === "agendado"}
             prices={prices}
           />
         )}
