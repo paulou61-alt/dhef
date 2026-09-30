@@ -90,8 +90,11 @@ export default function LoginPage() {
           <button type="submit" className="btn-primary w-full" disabled={loading}>{loading ? "Entrando..." : "Entrar"}</button>
         </form>
 
-        <div className="mt-5 text-center">
-          <Link href="/colaborador/login" className="text-sm font-semibold text-brand-600">
+        <div className="mt-5 space-y-3 text-center">
+          <p className="text-sm text-slate-500">
+            Ainda não tem conta? <Link href="/cadastro" className="font-semibold text-brand-600">Criar conta</Link>
+          </p>
+          <Link href="/colaborador/login" className="block text-sm font-semibold text-brand-600">
             Acesso exclusivo para colaboradores
           </Link>
         </div>
