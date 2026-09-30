@@ -52,11 +52,12 @@ begin
     raise exception 'Valor de pagamento inválido';
   end if;
 
+  -- Sem "for update": cobradores só têm permissão de leitura nas parcelas.
+  -- O bloqueio e a validação do saldo acontecem em register_payment_single.
   select *
     into v_target
   from public.installments
-  where id = p_installment_id
-  for update;
+  where id = p_installment_id;
 
   v_open := greatest(coalesce(v_target.amount, 0) - coalesce(v_target.paid_amount, 0), 0);
 
@@ -99,7 +100,6 @@ begin
       (i.sale_id = v_target.sale_id and i.installment_number > v_target.installment_number) desc,
       i.due_date,
       i.installment_number
-    for update of i
   loop
     exit when v_remaining <= 0;
     v_chunk := least(v_remaining, v_next.open_amount);
