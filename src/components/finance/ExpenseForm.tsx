@@ -2,7 +2,17 @@
 
 import { useState, useTransition } from "react";
 import { CloudOff } from "lucide-react";
+import { SelectField } from "@/components/ui/SelectField";
 import { submitOfflineCapableOperation } from "@/lib/offline/sync";
+
+const EXPENSE_CATEGORIES = [
+  { value: "mercadoria", label: "Mercadoria" },
+  { value: "transporte", label: "Transporte" },
+  { value: "embalagem", label: "Embalagem" },
+  { value: "alimentacao", label: "Alimentação" },
+  { value: "taxas", label: "Taxas" },
+  { value: "outros", label: "Outros" },
+];
 
 export function ExpenseForm() {
   const [description, setDescription] = useState("");
@@ -59,7 +69,7 @@ export function ExpenseForm() {
       <h2 className="text-[15px] font-bold text-slate-900">Nova despesa</h2>
       <div><label className="label">Descrição</label><input className="input-field" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ex.: combustível, embalagem..." /></div>
       <div className="grid grid-cols-2 gap-3">
-        <div><label className="label">Categoria</label><select className="input-field" value={category} onChange={(e) => setCategory(e.target.value)}><option value="mercadoria">Mercadoria</option><option value="transporte">Transporte</option><option value="embalagem">Embalagem</option><option value="alimentacao">Alimentação</option><option value="taxas">Taxas</option><option value="outros">Outros</option></select></div>
+        <div><label className="label">Categoria</label><SelectField value={category} onChange={setCategory} options={EXPENSE_CATEGORIES} /></div>
         <div><label className="label">Valor</label><input className="input-field" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0,00" /></div>
       </div>
       <div><label className="label">Data</label><input className="input-field" type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>

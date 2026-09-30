@@ -1,32 +1,41 @@
 "use client";
 
+import { SelectField } from "@/components/ui/SelectField";
+
 type CollaboratorOption = {
   id: string;
   name: string;
+  role?: string | null;
 };
+
+const ROLE_LABELS: Record<string, string> = { vendedor: "Vendedor", cobrador: "Cobrador" };
 
 export function CollaboratorFilterSelect({
   collaborators,
   defaultValue,
+  includeUnassigned = true,
 }: {
   collaborators: CollaboratorOption[];
   defaultValue: string;
+  includeUnassigned?: boolean;
 }) {
   return (
-    <select
+    <SelectField
       id="colaborador"
       name="colaborador"
       defaultValue={defaultValue}
-      onChange={(event) => event.currentTarget.form?.requestSubmit()}
-      className="input-field"
-    >
-      <option value="">Todos os colaboradores</option>
-      <option value="sem-colaborador">Sem colaborador</option>
-      {collaborators.map((collaborator) => (
-        <option key={collaborator.id} value={collaborator.id}>
-          {collaborator.name}
-        </option>
-      ))}
-    </select>
+      submitOnChange
+      searchable
+      searchPlaceholder="Buscar colaborador..."
+      options={[
+        { value: "", label: "Todos os colaboradores" },
+        ...(includeUnassigned ? [{ value: "sem-colaborador", label: "Sem colaborador" }] : []),
+        ...collaborators.map((collaborator) => ({
+          value: collaborator.id,
+          label: collaborator.name,
+          description: collaborator.role ? ROLE_LABELS[collaborator.role] : undefined,
+        })),
+      ]}
+    />
   );
 }
