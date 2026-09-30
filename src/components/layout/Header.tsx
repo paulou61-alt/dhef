@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { LogOut, Menu, X } from "lucide-react";
+import { Lock, LogOut, Menu, X } from "lucide-react";
 import { ALL_NAV, getMobileSecondaryNav } from "@/lib/nav-items";
 import type { AppRole } from "@/lib/access";
+import type { Feature } from "@/lib/billing/plans";
 import { useLogout } from "@/lib/use-logout";
 import { BrandMark } from "@/components/brand/BrandMark";
 
@@ -15,7 +16,7 @@ function getTitle(pathname: string): string {
   return match?.label ?? "Cobrei";
 }
 
-export function Header({ role }: { role: AppRole }) {
+export function Header({ role, lockedFeatures = [] }: { role: AppRole; lockedFeatures?: Feature[] }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const secondaryItems = getMobileSecondaryNav(role);
@@ -101,7 +102,8 @@ export function Header({ role }: { role: AppRole }) {
                     <span className={`flex h-9 w-9 flex-none items-center justify-center rounded-xl ${active ? "bg-white" : "bg-slate-50"}`}>
                       <Icon size={18} />
                     </span>
-                    <span className="min-w-0 text-[12px] font-bold leading-tight">{item.label}</span>
+                    <span className="min-w-0 flex-1 text-[12px] font-bold leading-tight">{item.label}</span>
+                    {item.feature && lockedFeatures.includes(item.feature) && <Lock size={13} className="flex-none text-slate-400" />}
                   </Link>
                 );
               })}

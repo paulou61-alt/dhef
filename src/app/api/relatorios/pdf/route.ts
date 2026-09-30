@@ -1,6 +1,7 @@
 import { createSimplePdf, type PdfSection } from "@/lib/pdf/simple-pdf";
 import { getMonthlyBusinessReport, normalizeReportMonth } from "@/lib/reports/monthly-report";
 import { formatCurrency, formatDate } from "@/utils/format";
+import { companyHasFeature } from "@/lib/billing/subscription";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,9 @@ const paymentLabels: Record<string, string> = {
 };
 
 export async function GET(request: Request) {
+  if (!(await companyHasFeature("relatorios"))) {
+    return new Response("O relatório em PDF está disponível a partir do plano Profissional.", { status: 403 });
+  }
   const url = new URL(request.url);
   const month = normalizeReportMonth(url.searchParams.get("month"));
   const report = await getMonthlyBusinessReport(month);

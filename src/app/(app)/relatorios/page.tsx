@@ -2,10 +2,14 @@ import { redirect } from "next/navigation";
 import { Download, FileText } from "lucide-react";
 import { getMonthlyBusinessReport, normalizeReportMonth } from "@/lib/reports/monthly-report";
 import { formatCurrency } from "@/utils/format";
+import { featureGate } from "@/lib/billing/gate";
 
 export const dynamic = "force-dynamic";
 
 export default async function RelatoriosPage({ searchParams }: { searchParams: { month?: string } }) {
+  const gate = await featureGate("relatorios");
+  if (gate) return gate;
+
   const monthKey = normalizeReportMonth(searchParams.month);
   const report = await getMonthlyBusinessReport(monthKey);
   if (!report) redirect("/");

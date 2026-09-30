@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { CalendarDays, HandCoins, Minus, Plus, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getAccessContext } from "@/lib/access";
+import { featureGate } from "@/lib/billing/gate";
 import { formatCurrency, formatDate } from "@/utils/format";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +19,8 @@ type ValeMovement = {
 export default async function MeuValePage() {
   const access = await getAccessContext();
   if (!access) redirect("/login");
+  const gate = await featureGate("vales");
+  if (gate) return gate;
   if (access.role === "owner") redirect("/colaboradores");
   if (!access.collaboratorId) redirect("/login");
 

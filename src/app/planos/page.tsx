@@ -41,7 +41,7 @@ export default async function PlanosPage({ searchParams }: { searchParams: { suc
             <p className="text-lg font-bold text-slate-900">Cobrei</p>
           </div>
           {!blocked && (
-            <Link href="/" className="inline-flex items-center gap-1 text-sm font-semibold text-slate-500 hover:text-slate-700">
+            <Link href={access.role === "owner" ? "/configuracoes#plano" : "/"} className="inline-flex items-center gap-1 text-sm font-semibold text-slate-500 hover:text-slate-700">
               <ChevronLeft size={17} /> Voltar ao sistema
             </Link>
           )}

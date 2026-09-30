@@ -11,17 +11,25 @@ import {
   UserRoundCog,
   BadgeDollarSign,
   HandCoins,
-  CreditCard,
   type LucideIcon,
 } from "lucide-react";
 import type { AppRole } from "@/lib/access";
 import type { ViewPermission } from "@/lib/permissions";
+import type { Feature } from "@/lib/billing/plans";
 
 export interface NavItem {
   href: string;
   label: string;
   icon: LucideIcon;
   permission?: ViewPermission;
+  /** Recurso de plano necessário para usar a tela (aparece com cadeado quando não incluso). */
+  feature?: Feature;
+}
+
+export interface NavSection {
+  id: string;
+  label: string;
+  items: NavItem[];
 }
 
 const OWNER_MAIN: NavItem[] = [
@@ -37,9 +45,8 @@ const OWNER_SECONDARY: NavItem[] = [
   { href: "/cobrancas", label: "Cobranças", icon: BadgeDollarSign },
   { href: "/colaboradores", label: "Colaboradores", icon: UserRoundCog },
   { href: "/despesas", label: "Despesas", icon: Receipt },
-  { href: "/financeiro", label: "Financeiro", icon: Wallet },
-  { href: "/relatorios", label: "Relatórios", icon: LineChart },
-  { href: "/planos", label: "Plano", icon: CreditCard },
+  { href: "/financeiro", label: "Financeiro", icon: Wallet, feature: "financeiro" },
+  { href: "/relatorios", label: "Relatórios", icon: LineChart, feature: "relatorios" },
   { href: "/configuracoes", label: "Configurações", icon: Settings },
 ];
 
@@ -48,14 +55,14 @@ const SELLER_MAIN: NavItem[] = [
   { href: "/vender", label: "Vender", icon: ShoppingCart, permission: "vender" },
   { href: "/clientes", label: "Clientes", icon: Users, permission: "clientes" },
   { href: "/fichas", label: "Fichas", icon: ClipboardList, permission: "fichas" },
-  { href: "/meu-vale", label: "Meu Vale", icon: HandCoins },
+  { href: "/meu-vale", label: "Meu Vale", icon: HandCoins, feature: "vales" },
 ];
 
 const COLLECTOR_MAIN: NavItem[] = [
   { href: "/cobrancas", label: "Cobranças", icon: BadgeDollarSign, permission: "cobrancas" },
   { href: "/clientes", label: "Clientes", icon: Users, permission: "clientes" },
   { href: "/fichas", label: "Fichas", icon: ClipboardList, permission: "fichas" },
-  { href: "/meu-vale", label: "Meu Vale", icon: HandCoins },
+  { href: "/meu-vale", label: "Meu Vale", icon: HandCoins, feature: "vales" },
 ];
 
 export const MAIN_NAV = OWNER_MAIN;
@@ -85,4 +92,16 @@ export function getMobileMainNav(role: AppRole, permissions: ViewPermission[] = 
 export function getMobileSecondaryNav(role: AppRole): NavItem[] {
   if (role !== "owner") return [];
   return OWNER_SECONDARY.map((item) => (item === COLABORADORES_ITEM ? ESTOQUE_ITEM : item));
+}
+
+const byHref = (href: string) => [...OWNER_MAIN, ...OWNER_SECONDARY].find((item) => item.href === href)!;
+
+/** Menu lateral do computador, agrupado por assunto. */
+export function getSidebarSections(role: AppRole, permissions: ViewPermission[] = []): NavSection[] {
+  if (role !== "owner") return [{ id: "menu", label: "Menu", items: getMainNav(role, permissions) }];
+  return [
+    { id: "operacao", label: "Operação", items: ["/", "/vender", "/clientes", "/fichas", "/receber", "/cobrancas"].map(byHref) },
+    { id: "gestao", label: "Gestão", items: ["/estoque", "/colaboradores", "/despesas", "/financeiro", "/relatorios"].map(byHref) },
+    { id: "conta", label: "Conta", items: ["/configuracoes"].map(byHref) },
+  ];
 }
