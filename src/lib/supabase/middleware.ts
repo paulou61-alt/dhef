@@ -3,7 +3,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "@/lib/supabase/config";
 import { firstAllowedPath, normalizeViewPermissions, permissionForPath } from "@/lib/permissions";
 
-const PUBLIC_ROUTES = ["/login", "/cadastro", "/colaborador/login", "/recuperar-senha", "/redefinir-senha", "/offline"];
+// O webhook do Stripe chega sem login; a autenticidade é conferida pela assinatura do Stripe.
+const PUBLIC_ROUTES = ["/login", "/cadastro", "/colaborador/login", "/recuperar-senha", "/redefinir-senha", "/offline", "/api/stripe/webhook"];
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 type CollaboratorAccess = {
@@ -75,7 +76,8 @@ export async function updateSession(request: NextRequest) {
     const requiredPermission = permissionForPath(pathname);
     const target = firstAllowedPath(collaborator.role, permissions);
     const isOwnValeRoute = pathname === "/meu-vale" || pathname.startsWith("/meu-vale/");
-    const isAllowedRoute = isOwnValeRoute || (requiredPermission !== null && permissions.includes(requiredPermission));
+    // /planos mostra ao colaborador o aviso de assinatura suspensa.
+    const isAllowedRoute = isOwnValeRoute || pathname === "/planos" || (requiredPermission !== null && permissions.includes(requiredPermission));
 
     if (!isAllowedRoute && target !== pathname && target !== "/login") {
       const url = request.nextUrl.clone();
