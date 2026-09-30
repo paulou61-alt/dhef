@@ -34,6 +34,8 @@ export interface Customer {
   id: string;
   user_id: string;
   ficha_number: number;
+  /** true quando o cliente quitou tudo e o número da ficha pode ser reutilizado */
+  ficha_released?: boolean;
   assigned_collaborator_id: string | null;
   name: string;
   phone: string | null;

@@ -51,6 +51,7 @@ export async function POST(request: Request) {
       const raw = error.message || "";
       let message = "Não foi possível sincronizar esta operação.";
       if (raw.includes("Estoque insuficiente")) message = raw;
+      else if (raw.includes("já está em uso por outro cliente")) message = raw;
       else if (raw.includes("saldo total em aberto")) message = "O pagamento é maior que tudo o que o cliente deve.";
       else if (raw.includes("maior que o saldo")) message = "O pagamento é maior que o saldo atual da parcela.";
       else if (raw.includes("Sessão expirada")) message = "Sessão expirada. Faça login novamente.";

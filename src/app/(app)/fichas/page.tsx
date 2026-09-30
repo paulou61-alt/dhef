@@ -144,7 +144,11 @@ export default async function FichasPage({ searchParams }: { searchParams: Searc
                           <p className="truncate text-sm font-semibold text-slate-800">{customer.name}</p>
                           <p className="text-xs text-slate-500">{stats.count} compra(s) · {formatCurrency(stats.total)} comprado</p>
                         </div>
-                        {open > 0 && <div className="text-right"><p className="text-xs text-slate-500">Em aberto</p><p className="text-sm font-bold text-warning">{formatCurrency(open)}</p></div>}
+                        {open > 0 ? (
+                          <div className="text-right"><p className="text-xs text-slate-500">Em aberto</p><p className="text-sm font-bold text-warning">{formatCurrency(open)}</p></div>
+                        ) : stats.saleIds.length > 0 ? (
+                          <span className="rounded-full bg-success/10 px-2 py-1 text-[10px] font-bold text-success">Quitado · ficha liberada</span>
+                        ) : null}
                         <ChevronRight size={18} className="text-slate-300" />
                       </Link>
                     );

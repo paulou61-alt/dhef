@@ -83,7 +83,7 @@ function buildCustomerPayload(formData: FormData) {
 
 function customerWriteError(error: any, fallback: string) {
   if (error?.code === "23505") {
-    return "Essa ficha já existe para o colaborador selecionado. Use outro número entre 1 e 1000.";
+    return "Essa ficha está em uso por um cliente com valores em aberto neste colaborador. Use outro número entre 1 e 1000.";
   }
 
   const message = String(error?.message ?? "").toLowerCase();
@@ -93,6 +93,7 @@ function customerWriteError(error: any, fallback: string) {
   if (message.includes("numeração da ficha não pode ser alterada")) return "O número da ficha não pode ser alterado depois do cadastro.";
   if (message.includes("colaborador responsável inválido")) return "Revise o colaborador responsável.";
   if (message.includes("estoque insuficiente")) return error.message;
+  if (message.includes("já está em uso por outro cliente")) return error.message;
   if (message.includes("entrada não pode")) return "A entrada da primeira compra não pode ser maior que o valor da compra.";
   return fallback;
 }
