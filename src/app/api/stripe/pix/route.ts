@@ -1,16 +1,19 @@
 import { NextResponse } from "next/server";
 import { getAccessContext } from "@/lib/access";
-import type Stripe from "stripe";
-import { appUrl, getStripeForPix } from "@/lib/billing/stripe";
+import { appUrl } from "@/lib/billing/stripe";
 import { billingErrorResponse } from "@/lib/billing/errors";
 import { preparePurchase } from "@/lib/billing/purchase";
+import { PLANS } from "@/lib/billing/plans";
 
 export const dynamic = "force-dynamic";
 
-// Dias para pagar cada fatura do Pix antes de ela ficar vencida.
-const DAYS_UNTIL_DUE = 3;
+// Tempo para pagar o QR Code do Pix antes de ele expirar.
+const PIX_EXPIRES_SECONDS = 60 * 60;
 
-// Assinatura por fatura paga no Pix: o Stripe gera uma fatura por período e envia por e-mail.
+/**
+ * Plano pré-pago no Pix: um pagamento avulso que libera 1 mês (ou 1 ano) de acesso.
+ * O webhook do Stripe confirma o pagamento e grava a nova data de vencimento.
+ */
 export async function POST(request: Request) {
   try {
     return await handle(request);
@@ -27,41 +30,41 @@ async function handle(request: Request) {
 
   const purchase = await preparePurchase(access, await request.json().catch(() => ({})));
   if (purchase instanceof NextResponse) return purchase;
-  const { admin, price, customerId, trialEnd } = purchase;
-  const stripe = getStripeForPix();
-  if (!stripe) return NextResponse.json({ error: "Pagamentos ainda não configurados. Tente mais tarde." }, { status: 503 });
+  const { stripe, price, customerId, plan, interval, paidUntilMs } = purchase;
+  if (price.unit_amount == null) return NextResponse.json({ error: "Preço do plano sem valor no Stripe." }, { status: 500 });
 
-  const subscription = await stripe.subscriptions.create({
+  // O novo período começa quando o atual (teste grátis ou Pix já pago) terminar, para não perder dias.
+  const periodEnd = new Date(Math.max(Date.now(), paidUntilMs));
+  periodEnd.setMonth(periodEnd.getMonth() + (interval === "anual" ? 12 : 1));
+
+  const planName = PLANS.find((item) => item.id === plan)?.name ?? plan;
+  const productId = typeof price.product === "string" ? price.product : price.product.id;
+  const metadata = {
+    kind: "cobrei_pix",
+    owner_id: access.ownerId,
+    plan,
+    interval,
+    period_end: periodEnd.toISOString(),
+  };
+
+  const baseUrl = appUrl(request);
+  const session = await stripe.checkout.sessions.create({
+    mode: "payment",
     customer: customerId,
-    items: [{ price: price.id }],
-    collection_method: "send_invoice",
-    days_until_due: DAYS_UNTIL_DUE,
-    payment_settings: {
-      payment_method_types: ["pix"] as unknown as Stripe.SubscriptionCreateParams.PaymentSettings.PaymentMethodType[],
+    client_reference_id: access.ownerId,
+    payment_method_types: ["pix"],
+    payment_method_options: { pix: { expires_after_seconds: PIX_EXPIRES_SECONDS } },
+    line_items: [{ quantity: 1, price_data: { currency: price.currency, unit_amount: price.unit_amount, product: productId } }],
+    metadata,
+    payment_intent_data: {
+      description: `Cobrei ${planName} (${interval}) até ${periodEnd.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
+      metadata,
     },
-    metadata: { owner_id: access.ownerId },
-    ...(trialEnd ? { trial_end: trialEnd } : {}),
+    allow_promotion_codes: true,
+    locale: "pt-BR",
+    success_url: `${baseUrl}/planos?sucesso=1`,
+    cancel_url: `${baseUrl}/planos`,
   });
 
-  // Durante o teste grátis não há nada a pagar agora: a primeira fatura chega quando o teste acabar.
-  if (trialEnd) {
-    await admin.from("subscriptions").upsert(
-      { owner_id: access.ownerId, stripe_customer_id: customerId, stripe_subscription_id: subscription.id, status: "trialing" },
-      { onConflict: "owner_id" }
-    );
-    return NextResponse.json({ url: `${appUrl(request)}/planos?pix=agendado` });
-  }
-
-  // Sem teste: finaliza e envia a primeira fatura agora e leva o cliente direto para o QR Code.
-  const invoiceId = typeof subscription.latest_invoice === "string" ? subscription.latest_invoice : subscription.latest_invoice?.id;
-  if (!invoiceId) return NextResponse.json({ error: "O Stripe não gerou a fatura do Pix." }, { status: 500 });
-  const invoice = await stripe.invoices.sendInvoice(invoiceId);
-
-  // Até o Pix ser pago, a empresa fica aguardando (sem acesso liberado).
-  await admin.from("subscriptions").upsert(
-    { owner_id: access.ownerId, stripe_customer_id: customerId, stripe_subscription_id: subscription.id, status: "incomplete" },
-    { onConflict: "owner_id" }
-  );
-
-  return NextResponse.json({ url: invoice.hosted_invoice_url });
+  return NextResponse.json({ url: session.url });
 }

@@ -16,8 +16,6 @@ type Props = {
   hasCustomer: boolean;
   blocked: boolean;
   success: boolean;
-  /** Assinou com Pix durante o teste grátis: a primeira fatura chega quando o teste acabar. */
-  pixScheduled?: boolean;
   prices: Record<string, number>;
 };
 
@@ -37,32 +35,31 @@ async function postForUrl(path: string, body?: unknown) {
 
 export function PlansView(props: Props) {
   const [interval, setInterval] = useState<BillingInterval>(props.currentInterval === "anual" ? "anual" : "mensal");
-  const [method, setMethod] = useState<"cartao" | "pix">("cartao");
+  const [method, setMethod] = useState<"cartao" | "pix">(props.status === "pix" ? "pix" : "cartao");
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const subscribed = props.status ? SUBSCRIBED_STATUSES.has(props.status) : false;
+  // Plano pré-pago no Pix ainda dentro da validade.
+  const pixActive = props.status === "pix" && !props.blocked;
+  const hasPlan = subscribed || pixActive;
   const router = useRouter();
   const [confirmationTimedOut, setConfirmationTimedOut] = useState(false);
-  const waitingConfirmation = props.success && !subscribed && !confirmationTimedOut;
-  // Assinatura por Pix criada, mas a primeira fatura ainda não foi paga.
-  const awaitingPix = props.status === "incomplete";
+  const waitingConfirmation = props.success && !hasPlan && !confirmationTimedOut;
 
-  // Depois do pagamento, o Stripe avisa o sistema em alguns segundos: recarrega os dados até a assinatura aparecer.
-  // Para o Pix, a pessoa paga em outra aba, então esperamos mais tempo.
+  // Depois do pagamento, o Stripe avisa o sistema em alguns segundos: recarrega os dados até o plano aparecer.
   useEffect(() => {
-    if (!waitingConfirmation && !awaitingPix) return;
-    const maxAttempts = awaitingPix ? 60 : 10;
+    if (!waitingConfirmation) return;
     let attempts = 0;
     const timer = window.setInterval(() => {
       attempts += 1;
       router.refresh();
-      if (attempts >= maxAttempts) {
+      if (attempts >= 20) {
         window.clearInterval(timer);
-        if (!awaitingPix) setConfirmationTimedOut(true);
+        setConfirmationTimedOut(true);
       }
-    }, awaitingPix ? 5000 : 3000);
+    }, 3000);
     return () => window.clearInterval(timer);
-  }, [waitingConfirmation, awaitingPix, router]);
+  }, [waitingConfirmation, router]);
 
   async function go(key: string, path: string, body?: unknown) {
     setError(null);
@@ -86,42 +83,19 @@ export function PlansView(props: Props) {
 
       {props.success && (
         <StatusBox tone="success" icon={<CheckCircle2 size={20} />}>
-          {subscribed
-            ? "Pagamento confirmado! Sua assinatura está ativa."
+          {hasPlan
+            ? "Pagamento confirmado! Seu plano está ativo."
             : waitingConfirmation
-              ? "Pagamento recebido! Confirmando sua assinatura com o Stripe..."
+              ? "Pagamento recebido! Confirmando com o Stripe (no Pix pode levar até 1 minuto)..."
               : "Pagamento recebido, mas a confirmação ainda não chegou. Atualize a página em alguns minutos; se continuar assim, fale com o suporte."}
         </StatusBox>
       )}
-      {awaitingPix && (
-        <div className="mx-auto max-w-3xl rounded-2xl border border-brand-200 bg-brand-50 px-4 py-4 text-sm">
-          <div className="flex items-start gap-3">
-            <Clock size={20} className="mt-0.5 flex-none text-brand-600" />
-            <div className="min-w-0 flex-1 text-slate-700">
-              <p className="font-semibold text-slate-900">Aguardando o pagamento do Pix</p>
-              <p className="mt-1">Assim que o Pix for pago, sua assinatura é ativada automaticamente (normalmente em menos de 1 minuto). A fatura também foi enviada para o seu e-mail.</p>
-              <button
-                type="button"
-                onClick={() => go("pending", "/api/stripe/pending-invoice")}
-                disabled={loading !== null}
-                className="btn-primary mt-3 inline-flex !w-auto items-center justify-center gap-2 px-5"
-              >
-                {loading === "pending" && <Loader2 size={16} className="animate-spin" />}
-                Abrir fatura do Pix
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {props.pixScheduled && (
-        <StatusBox tone="success" icon={<CheckCircle2 size={20} />}>
-          Assinatura com Pix confirmada! Você continua no teste grátis e recebe a primeira fatura por e-mail quando ele acabar.
-        </StatusBox>
-      )}
-      {props.blocked && !props.success && !awaitingPix && (
+      {props.blocked && !props.success && (
         <StatusBox tone="danger" icon={<AlertTriangle size={20} />}>
           {props.status === "trial"
             ? "Seu teste grátis terminou. Escolha um plano para continuar usando o Cobrei. Seus dados estão guardados."
+            : props.status === "pix"
+              ? "Seu plano pago no Pix venceu. Renove para continuar usando o Cobrei. Seus dados estão guardados."
             : "Sua assinatura não está ativa. Escolha um plano ou atualize o pagamento para voltar a usar o Cobrei. Seus dados estão guardados."}
         </StatusBox>
       )}
@@ -166,6 +140,28 @@ export function PlansView(props: Props) {
         </div>
       )}
 
+      {pixActive && (
+        <div className="card flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Seu plano</p>
+            <p className="mt-1 text-lg font-bold text-slate-900">
+              {PLANS.find((plan) => plan.id === props.currentPlan)?.name ?? "Plano"}
+              <span className="text-sm font-medium text-slate-500"> · pago no Pix</span>
+            </p>
+            {props.periodEnd && <p className="mt-0.5 text-xs text-slate-500">Acesso garantido até {formatDate(props.periodEnd)}. Renove antes para não perder dias.</p>}
+          </div>
+          <button
+            type="button"
+            onClick={() => go("renew", "/api/stripe/pix", { plan: props.currentPlan, interval: props.currentInterval ?? "mensal" })}
+            disabled={loading !== null || !props.currentPlan}
+            className="btn-primary inline-flex !w-auto items-center justify-center gap-2 px-5"
+          >
+            {loading === "renew" && <Loader2 size={16} className="animate-spin" />}
+            Renovar com Pix
+          </button>
+        </div>
+      )}
+
       {!subscribed && !waitingConfirmation && (
         <>
           <div className="mx-auto flex w-fit rounded-2xl bg-slate-100 p-1.5">
@@ -197,7 +193,7 @@ export function PlansView(props: Props) {
             </div>
             <p className="mt-2 text-xs text-slate-500">
               {method === "pix"
-                ? `Você recebe uma fatura por e-mail a cada ${interval === "mensal" ? "mês" : "ano"} e paga pelo Pix em até 3 dias. Sem pagamento, o acesso é suspenso.`
+                ? `Pagamento único no Pix que libera 1 ${interval === "mensal" ? "mês" : "ano"} de acesso. Avisamos 5 dias antes de vencer; sem renovação, o acesso é suspenso.`
                 : "Cobrança automática no cartão. Cancele quando quiser."}
             </p>
           </div>
