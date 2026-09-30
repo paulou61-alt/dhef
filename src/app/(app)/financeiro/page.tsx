@@ -1,18 +1,21 @@
 import { createClient } from "@/lib/supabase/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { formatCurrency, formatDateTime } from "@/utils/format";
 
 export const dynamic = "force-dynamic";
 
 export default async function FinanceiroPage() {
   const supabase = createClient();
-  const [{ data: movements }, { data: installments }, { data: saleItems }] = await Promise.all([
+  const [{ data: movements }, { data: allMovements }, { data: installments }, { data: saleItems }] = await Promise.all([
+    // A lista mostra só as 200 mais recentes; os totais usam todas as movimentações.
     supabase.from("cash_movements").select("*").order("created_at", { ascending: false }).limit(200),
-    supabase.from("installments").select("amount, paid_amount, status"),
-    supabase.from("sale_items").select("quantity, unit_cost_snapshot, unit_price_snapshot"),
+    fetchAll((from, to) => supabase.from("cash_movements").select("type, amount").order("id").range(from, to)),
+    fetchAll((from, to) => supabase.from("installments").select("amount, paid_amount, status").order("id").range(from, to)),
+    fetchAll((from, to) => supabase.from("sale_items").select("quantity, unit_cost_snapshot, unit_price_snapshot").order("id").range(from, to)),
   ]);
 
-  const entries = (movements ?? []).filter((m) => m.type === "entrada").reduce((s, m) => s + Number(m.amount), 0);
-  const exits = (movements ?? []).filter((m) => m.type === "saida").reduce((s, m) => s + Number(m.amount), 0);
+  const entries = allMovements.filter((m) => m.type === "entrada").reduce((s, m) => s + Number(m.amount), 0);
+  const exits = allMovements.filter((m) => m.type === "saida").reduce((s, m) => s + Number(m.amount), 0);
   const balance = entries - exits;
   const receivable = (installments ?? []).filter((i) => i.status !== "pago").reduce((s, i) => s + Number(i.amount) - Number(i.paid_amount), 0);
   const grossProfit = (saleItems ?? []).reduce((s, i) => s + (Number(i.unit_price_snapshot) - Number(i.unit_cost_snapshot)) * Number(i.quantity), 0);

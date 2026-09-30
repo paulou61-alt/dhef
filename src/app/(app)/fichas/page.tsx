@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ClipboardList, ChevronRight, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { getAccessContext } from "@/lib/access";
 import { SearchBar } from "@/components/ui/SearchBar";
 import { formatCurrency } from "@/utils/format";
@@ -27,21 +28,24 @@ export default async function FichasPage({ searchParams }: { searchParams: Searc
   const isOwner = access.role === "owner";
   const collaboratorFilter = isOwner ? (searchParams.colaborador ?? "") : (access.collaboratorId ?? "");
 
-  let customerQuery = supabase
-    .from("customers")
-    .select("id, name, phone, city, ficha_number, assigned_collaborator_id")
-    .order("ficha_number", { ascending: true });
+  function customerQuery(from: number, to: number) {
+    let builder = supabase
+      .from("customers")
+      .select("id, name, phone, city, ficha_number, assigned_collaborator_id");
 
-  if (query) {
-    if (/^\d+$/.test(query)) customerQuery = customerQuery.eq("ficha_number", Number(query));
-    else customerQuery = customerQuery.ilike("name", `%${query}%`);
-  }
-  if (!isOwner && access.collaboratorId) {
-    customerQuery = customerQuery.eq("assigned_collaborator_id", access.collaboratorId);
-  } else if (collaboratorFilter === "sem") {
-    customerQuery = customerQuery.is("assigned_collaborator_id", null);
-  } else if (collaboratorFilter) {
-    customerQuery = customerQuery.eq("assigned_collaborator_id", collaboratorFilter);
+    if (query) {
+      if (/^\d+$/.test(query)) builder = builder.eq("ficha_number", Number(query));
+      else builder = builder.ilike("name", `%${query}%`);
+    }
+    if (!isOwner && access?.collaboratorId) {
+      builder = builder.eq("assigned_collaborator_id", access.collaboratorId);
+    } else if (collaboratorFilter === "sem") {
+      builder = builder.is("assigned_collaborator_id", null);
+    } else if (collaboratorFilter) {
+      builder = builder.eq("assigned_collaborator_id", collaboratorFilter);
+    }
+
+    return builder.order("ficha_number", { ascending: true }).order("id").range(from, to);
   }
 
   let collaboratorsQuery = supabase
@@ -54,10 +58,12 @@ export default async function FichasPage({ searchParams }: { searchParams: Searc
   }
 
   const [{ data: customers }, { data: collaborators }, { data: sales }, { data: installments }] = await Promise.all([
-    customerQuery,
+    fetchAll(customerQuery),
     collaboratorsQuery,
-    supabase.from("sales").select("id, customer_id, total, status, is_opening_balance").eq("status", "completed"),
-    supabase.from("installments").select("sale_id, amount, paid_amount, status"),
+    fetchAll((from, to) =>
+      supabase.from("sales").select("id, customer_id, total, status, is_opening_balance").eq("status", "completed").order("id").range(from, to)
+    ),
+    fetchAll((from, to) => supabase.from("installments").select("sale_id, amount, paid_amount, status").order("id").range(from, to)),
   ]);
 
   const collaboratorMap = new Map((collaborators ?? []).map((c) => [c.id, c]));

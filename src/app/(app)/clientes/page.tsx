@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Users, ChevronRight, MessageCircle, CheckCircle2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { getAccessContext } from "@/lib/access";
 import { SearchBar } from "@/components/ui/SearchBar";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -17,13 +18,25 @@ export default async function ClientesPage({ searchParams }: { searchParams: { q
   const query = searchParams.q?.trim() ?? "";
   const canCreate = access?.role !== "cobrador";
 
-  let customersQuery = supabase.from("customers").select("id, name, phone, whatsapp, city").order("name", { ascending: true });
-  if (query) customersQuery = customersQuery.ilike("name", `%${query}%`);
+  function customersQuery(from: number, to: number) {
+    let builder = supabase.from("customers").select("id, name, phone, whatsapp, city");
+    if (query) builder = builder.ilike("name", `%${query}%`);
+    return builder.order("name", { ascending: true }).order("id").range(from, to);
+  }
 
   const [{ data: customers }, { data: openInstallments }, { data: sales }] = await Promise.all([
-    customersQuery,
-    supabase.from("installments").select("id, sale_id, installment_number, total_installments, amount, paid_amount, due_date, status").in("status", ["pendente", "parcial", "vencido"]),
-    supabase.from("sales").select("id, customer_id, sale_number, is_opening_balance").neq("status", "cancelled"),
+    fetchAll(customersQuery),
+    fetchAll((from, to) =>
+      supabase
+        .from("installments")
+        .select("id, sale_id, installment_number, total_installments, amount, paid_amount, due_date, status")
+        .in("status", ["pendente", "parcial", "vencido"])
+        .order("id")
+        .range(from, to)
+    ),
+    fetchAll((from, to) =>
+      supabase.from("sales").select("id, customer_id, sale_number, is_opening_balance").neq("status", "cancelled").order("id").range(from, to)
+    ),
   ]);
 
   const saleMap = new Map((sales ?? []).map((sale) => [sale.id, sale]));

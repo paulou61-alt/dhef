@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 
 export const dynamic = "force-dynamic";
 
@@ -9,25 +10,24 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Sessão expirada." }, { status: 401 });
 
   const [customersResult, productsResult, variantsResult, installmentsResult] = await Promise.all([
-    supabase
-      .from("customers")
-      .select("id, name, phone, whatsapp, ficha_number")
-      .order("name"),
-    supabase
-      .from("products")
-      .select("id, name, sale_price")
-      .eq("is_active", true)
-      .order("name"),
-    supabase
-      .from("product_variants")
-      .select("id, product_id, variant_name, stock_quantity, sale_price")
-      .order("variant_name"),
-    supabase
-      .from("installments")
-      .select("id, amount, paid_amount, due_date, status, sales!inner(id, sale_number, customer_id, customers(id, name))")
-      .in("status", ["pendente", "parcial", "vencido"])
-      .order("due_date", { ascending: true })
-      .limit(500),
+    fetchAll((from, to) =>
+      supabase.from("customers").select("id, name, phone, whatsapp, ficha_number").order("name").order("id").range(from, to)
+    ),
+    fetchAll((from, to) =>
+      supabase.from("products").select("id, name, sale_price").eq("is_active", true).order("name").order("id").range(from, to)
+    ),
+    fetchAll((from, to) =>
+      supabase.from("product_variants").select("id, product_id, variant_name, stock_quantity, sale_price").order("variant_name").order("id").range(from, to)
+    ),
+    fetchAll((from, to) =>
+      supabase
+        .from("installments")
+        .select("id, amount, paid_amount, due_date, status, sales!inner(id, sale_number, customer_id, customers(id, name))")
+        .in("status", ["pendente", "parcial", "vencido"])
+        .order("due_date", { ascending: true })
+        .order("id")
+        .range(from, to)
+    ),
   ]);
 
   const error = customersResult.error || productsResult.error || variantsResult.error || installmentsResult.error;

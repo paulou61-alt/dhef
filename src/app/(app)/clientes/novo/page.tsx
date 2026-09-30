@@ -4,6 +4,7 @@ import { ChevronLeft } from "lucide-react";
 import { CustomerForm } from "@/components/customers/CustomerForm";
 import { createCustomer } from "@/app/(app)/clientes/actions";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { getAccessContext } from "@/lib/access";
 
 export default async function NovoClientePage() {
@@ -18,15 +19,12 @@ export default async function NovoClientePage() {
       .select("id, name, role")
       .eq("is_active", true)
       .order("name"),
-    supabase
-      .from("products")
-      .select("id, name, sale_price")
-      .eq("is_active", true)
-      .order("name"),
-    supabase
-      .from("product_variants")
-      .select("id, product_id, variant_name, stock_quantity, sale_price")
-      .order("variant_name"),
+    fetchAll((from, to) =>
+      supabase.from("products").select("id, name, sale_price").eq("is_active", true).order("name").order("id").range(from, to)
+    ),
+    fetchAll((from, to) =>
+      supabase.from("product_variants").select("id, product_id, variant_name, stock_quantity, sale_price").order("variant_name").order("id").range(from, to)
+    ),
   ]);
 
   return (

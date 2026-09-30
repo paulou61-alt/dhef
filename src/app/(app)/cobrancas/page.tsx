@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CheckCircle2, Filter, MapPin, MessageCircle, WalletCards } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { getAccessContext } from "@/lib/access";
 import { ReceiveButton } from "@/components/finance/ReceiveButton";
 import { CollaboratorFilterSelect } from "@/components/finance/CollaboratorFilterSelect";
@@ -32,15 +33,23 @@ export default async function CobrancasPage({
     { data: products },
     { data: variants },
   ] = await Promise.all([
-    supabase.from("installments").select("*").order("due_date"),
-    supabase.from("sales").select("id, customer_id, sale_number, is_opening_balance").neq("status", "cancelled"),
-    supabase
-      .from("customers")
-      .select("id, ficha_number, name, phone, whatsapp, address, neighborhood, city, state, zip_code, assigned_collaborator_id")
-      .order("ficha_number"),
+    fetchAll((from, to) => supabase.from("installments").select("*").order("due_date").order("id").range(from, to)),
+    fetchAll((from, to) =>
+      supabase.from("sales").select("id, customer_id, sale_number, is_opening_balance").neq("status", "cancelled").order("id").range(from, to)
+    ),
+    fetchAll((from, to) =>
+      supabase
+        .from("customers")
+        .select("id, ficha_number, name, phone, whatsapp, address, neighborhood, city, state, zip_code, assigned_collaborator_id")
+        .order("ficha_number")
+        .order("id")
+        .range(from, to)
+    ),
     supabase.from("collaborators").select("id, name, role, is_active").eq("is_active", true).order("name"),
-    supabase.from("products").select("id, name, sale_price").eq("is_active", true).order("name"),
-    supabase.from("product_variants").select("id, product_id, variant_name, stock_quantity, sale_price").order("variant_name"),
+    fetchAll((from, to) => supabase.from("products").select("id, name, sale_price").eq("is_active", true).order("name").order("id").range(from, to)),
+    fetchAll((from, to) =>
+      supabase.from("product_variants").select("id, product_id, variant_name, stock_quantity, sale_price").order("variant_name").order("id").range(from, to)
+    ),
   ]);
 
   const activeCollaborators = collaborators ?? [];
