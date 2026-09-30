@@ -4,6 +4,7 @@ import { CheckCircle2, Filter, MapPin, MessageCircle, WalletCards } from "lucide
 import { createClient } from "@/lib/supabase/server";
 import { getAccessContext } from "@/lib/access";
 import { ReceiveButton } from "@/components/finance/ReceiveButton";
+import { CollaboratorFilterSelect } from "@/components/finance/CollaboratorFilterSelect";
 import { formatCurrency, formatDate } from "@/utils/format";
 import { whatsappLink } from "@/utils/masks";
 import { buildChargeMessage, type ChargeInstallment } from "@/utils/charge-message";
@@ -142,16 +143,12 @@ export default async function CobrancasPage({
           <Filter size={16} className="text-brand-600" />
           Filtro por colaborador
         </div>
-        <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-          <select name="colaborador" defaultValue={selectedCollaboratorId} className="input-field">
-            <option value="">Todos os colaboradores</option>
-            {activeCollaborators.map((collaborator) => (
-              <option key={collaborator.id} value={collaborator.id}>
-                {collaborator.name} — {collaborator.role === "vendedor" ? "Vendedor" : "Cobrador"}
-              </option>
-            ))}
-          </select>
-          <button type="submit" className="btn-primary whitespace-nowrap px-5">Aplicar filtro</button>
+        <div className="mt-3">
+          <CollaboratorFilterSelect
+            collaborators={activeCollaborators}
+            defaultValue={selectedCollaboratorId}
+            includeUnassigned={false}
+          />
         </div>
         <p className="mt-2 text-[11px] text-slate-500">
           O filtro usa o colaborador responsável cadastrado na ficha. Cada colaborador possui sua própria sequência de fichas #1 a #1000.

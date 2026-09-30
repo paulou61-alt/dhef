@@ -4,12 +4,27 @@ import { useState, useTransition } from "react";
 import { CloudOff, ShoppingBag } from "lucide-react";
 import { submitOfflineCapableOperation } from "@/lib/offline/sync";
 import { formatCurrency } from "@/utils/format";
+import { SelectField } from "@/components/ui/SelectField";
 import {
   PurchaseProductSelector,
   type PurchaseItem,
   type PurchaseProduct,
   type PurchaseVariant,
 } from "@/components/sales/PurchaseProductSelector";
+
+const RECEIVE_METHODS = [
+  { value: "pix", label: "Pix" },
+  { value: "dinheiro", label: "Dinheiro" },
+  { value: "cartao", label: "Cartão" },
+];
+
+const PURCHASE_METHODS = [
+  { value: "parcelado", label: "Parcelado" },
+  { value: "fiado", label: "Fiado" },
+  { value: "pix", label: "Pix" },
+  { value: "dinheiro", label: "Dinheiro" },
+  { value: "cartao", label: "Cartão" },
+];
 
 export function ReceiveButton({
   installmentId,
@@ -144,11 +159,11 @@ export function ReceiveButton({
                 </div>
                 <div>
                   <label className="label">Forma do recebimento</label>
-                  <select className="input-field" value={method} onChange={(e) => setMethod(e.target.value as any)}>
-                    <option value="pix">Pix</option>
-                    <option value="dinheiro">Dinheiro</option>
-                    <option value="cartao">Cartão</option>
-                  </select>
+                  <SelectField
+                    value={method}
+                    onChange={(value) => setMethod(value as "pix" | "dinheiro" | "cartao")}
+                    options={RECEIVE_METHODS}
+                  />
                 </div>
                 <div>
                   <label className="label">Data</label>
@@ -181,13 +196,7 @@ export function ReceiveButton({
                   <div className="space-y-3 border-t border-brand-100 pt-3">
                     <div>
                       <label className="label">Forma da nova compra</label>
-                      <select className="input-field bg-white" value={purchasePaymentMethod} onChange={(e) => setPurchasePaymentMethod(e.target.value)}>
-                        <option value="parcelado">Parcelado</option>
-                        <option value="fiado">Fiado</option>
-                        <option value="pix">Pix</option>
-                        <option value="dinheiro">Dinheiro</option>
-                        <option value="cartao">Cartão</option>
-                      </select>
+                      <SelectField value={purchasePaymentMethod} onChange={setPurchasePaymentMethod} options={PURCHASE_METHODS} />
                     </div>
 
                     {purchaseNeedsTerms && (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { SelectField } from "@/components/ui/SelectField";
 import { maskPhone, maskCEP, maskCPF, maskCurrencyInput } from "@/utils/masks";
 import type { Customer } from "@/types/database.types";
 import type { CustomerFormState } from "@/app/(app)/clientes/actions";
@@ -149,14 +150,21 @@ export function CustomerForm({
         {accessRole === "owner" && (
           <div>
             <label className="label" htmlFor="assigned_collaborator_id">Colaborador responsável</label>
-            <select id="assigned_collaborator_id" name="assigned_collaborator_id" className="input-field" defaultValue={customer?.assigned_collaborator_id ?? ""}>
-              <option value="">Sem colaborador</option>
-              {collaborators.map((collaborator) => (
-                <option key={collaborator.id} value={collaborator.id}>
-                  {collaborator.name} — {collaborator.role === "vendedor" ? "Vendedor" : "Cobrador"}
-                </option>
-              ))}
-            </select>
+            <SelectField
+              id="assigned_collaborator_id"
+              name="assigned_collaborator_id"
+              defaultValue={customer?.assigned_collaborator_id ?? ""}
+              searchable
+              searchPlaceholder="Buscar colaborador..."
+              options={[
+                { value: "", label: "Sem colaborador" },
+                ...collaborators.map((collaborator) => ({
+                  value: collaborator.id,
+                  label: collaborator.name,
+                  description: collaborator.role === "vendedor" ? "Vendedor" : "Cobrador",
+                })),
+              ]}
+            />
             <p className="mt-1 text-[11px] text-slate-400">Cada colaborador possui sua própria sequência de fichas #1 a #1000.</p>
           </div>
         )}
@@ -177,10 +185,15 @@ export function CustomerForm({
           </div>
           <div>
             <label className="label" htmlFor="state">Estado</label>
-            <select id="state" name="state" className="input-field" defaultValue={customer?.state ?? ""}>
-              <option value="">Selecione</option>
-              {BR_STATES.map((uf) => <option key={uf} value={uf}>{uf}</option>)}
-            </select>
+            <SelectField
+              id="state"
+              name="state"
+              defaultValue={customer?.state ?? ""}
+              placeholder="Selecione"
+              searchable
+              searchPlaceholder="Buscar UF..."
+              options={[{ value: "", label: "Selecione" }, ...BR_STATES.map((uf) => ({ value: uf, label: uf }))]}
+            />
           </div>
         </div>
 
@@ -231,19 +244,19 @@ export function CustomerForm({
             <div className="space-y-3 rounded-2xl bg-surface-muted p-4">
               <div>
                 <label className="label" htmlFor="initial_payment_method">Forma de pagamento</label>
-                <select
+                <SelectField
                   id="initial_payment_method"
                   name="initial_payment_method"
-                  className="input-field bg-white"
                   value={initialPaymentMethod}
-                  onChange={(e) => setInitialPaymentMethod(e.target.value)}
-                >
-                  <option value="parcelado">Parcelado</option>
-                  <option value="fiado">Fiado</option>
-                  <option value="pix">Pix</option>
-                  <option value="dinheiro">Dinheiro</option>
-                  <option value="cartao">Cartão</option>
-                </select>
+                  onChange={setInitialPaymentMethod}
+                  options={[
+                    { value: "parcelado", label: "Parcelado" },
+                    { value: "fiado", label: "Fiado" },
+                    { value: "pix", label: "Pix" },
+                    { value: "dinheiro", label: "Dinheiro" },
+                    { value: "cartao", label: "Cartão" },
+                  ]}
+                />
               </div>
 
               {initialNeedsTerms && (

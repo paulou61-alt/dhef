@@ -11,8 +11,12 @@ export type SelectOption = {
 };
 
 export function SelectField({
-  value,
+  value: controlledValue,
+  defaultValue = "",
   onChange,
+  name,
+  id,
+  submitOnChange = false,
   options,
   placeholder = "Selecione uma opção",
   searchable = false,
@@ -20,8 +24,15 @@ export function SelectField({
   className = "",
   disabled = false,
 }: {
-  value: string;
-  onChange: (value: string) => void;
+  /** Valor controlado. Sem ele, o campo guarda o próprio valor a partir de defaultValue. */
+  value?: string;
+  defaultValue?: string;
+  onChange?: (value: string) => void;
+  /** Nome do campo enviado em formulários (gera um input escondido). */
+  name?: string;
+  id?: string;
+  /** Envia o formulário assim que uma opção é escolhida. */
+  submitOnChange?: boolean;
   options: SelectOption[];
   placeholder?: string;
   searchable?: boolean;
@@ -33,6 +44,9 @@ export function SelectField({
   const searchRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [innerValue, setInnerValue] = useState(defaultValue);
+  const value = controlledValue ?? innerValue;
+  const hiddenRef = useRef<HTMLInputElement>(null);
 
   const selected = options.find((option) => option.value === value);
 
@@ -84,14 +98,22 @@ export function SelectField({
 
   function choose(option: SelectOption) {
     if (option.disabled) return;
-    onChange(option.value);
+    setInnerValue(option.value);
+    onChange?.(option.value);
     setOpen(false);
     setQuery("");
+    if (submitOnChange && option.value !== value) {
+      const form = rootRef.current?.closest("form");
+      if (hiddenRef.current) hiddenRef.current.value = option.value;
+      form?.requestSubmit();
+    }
   }
 
   return (
     <div ref={rootRef} className={`relative ${className}`}>
+      {name && <input ref={hiddenRef} type="hidden" name={name} value={value} />}
       <button
+        id={id}
         type="button"
         disabled={disabled}
         aria-haspopup="listbox"
