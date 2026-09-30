@@ -8,6 +8,7 @@ import { getMainNav, getSecondaryNav } from "@/lib/nav-items";
 import type { AppRole } from "@/lib/access";
 import type { ViewPermission } from "@/lib/permissions";
 import { useLogout } from "@/lib/use-logout";
+import { BrandMark } from "@/components/brand/BrandMark";
 
 const ROLE_LABELS: Record<AppRole, string> = { owner: "Proprietário", vendedor: "Vendedor", cobrador: "Cobrador" };
 
@@ -43,9 +44,9 @@ export function Sidebar({ role, displayName, viewPermissions = [] }: { role: App
     <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-slate-200/80 bg-slate-50/95 px-4 py-5 backdrop-blur-xl md:flex">
       <div className="mb-6 px-1">
         <div className="flex items-center gap-3 rounded-2xl bg-slate-950 px-3 py-3 text-white shadow-floating">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500 text-base font-black shadow-sm">V</div>
+          <BrandMark size={40} className="shadow-sm" />
           <div className="min-w-0">
-            <p className="truncate text-[14px] font-bold">Controle de Vendas</p>
+            <p className="truncate text-[14px] font-bold">Cobrei</p>
             <p className="mt-0.5 flex items-center gap-1 text-[10px] font-medium text-slate-400"><Sparkles size={11} /> Gestão do negócio</p>
           </div>
         </div>

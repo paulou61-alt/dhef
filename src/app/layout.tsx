@@ -5,13 +5,13 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "Controle de Vendas",
-  description: "Sistema de controle de vendas para sacoleiros e pequenos revendedores",
+  title: "Cobrei",
+  description: "Vendas no crediário, fichas e cobranças na palma da mão",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Controle de Vendas",
+    title: "Cobrei",
   },
 };
 
