@@ -107,7 +107,7 @@ export default function CadastroPage() {
           </div>
           <div>
             <label className="label" htmlFor="business_name">Nome do negócio</label>
-            <input id="business_name" autoComplete="organization" required className="input-field" placeholder="Ex.: Cestas Básicas JHC" value={businessName} onChange={(e) => setBusinessName(e.target.value)} />
+            <input id="business_name" autoComplete="organization" required className="input-field" placeholder="Nome da sua loja ou empresa" value={businessName} onChange={(e) => setBusinessName(e.target.value)} />
           </div>
           <div>
             <label className="label" htmlFor="email">E-mail</label>
