@@ -24,7 +24,8 @@ export default async function ConfiguracoesPage() {
     : { data: null as any };
 
   const subscription = access?.role === "owner" ? await getSubscription(access) : null;
-  const summary = planSummary(subscription);
+  // Sem linha de assinatura (ex.: tabela ainda não criada no banco), o cartão continua aparecendo.
+  const summary = planSummary(subscription) ?? { label: "Nenhum plano ativo", hint: null, tone: "warning" as const };
   const features = planFeatures(subscription);
 
   return (
@@ -34,7 +35,7 @@ export default async function ConfiguracoesPage() {
         <p className="mt-1 text-sm text-slate-500">Dados do seu negócio e da sua assinatura do Cobrei.</p>
       </div>
 
-      {access?.role === "owner" && summary && (
+      {access?.role === "owner" && (
         <section id="plano" className="card scroll-mt-24">
           <div className="flex items-start gap-3">
             <span className="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-brand-50 text-brand-600">
