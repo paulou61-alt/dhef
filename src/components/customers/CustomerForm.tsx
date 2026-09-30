@@ -83,6 +83,9 @@ export function CustomerForm({
     });
   }
 
+  // Clientes quitados liberam a ficha; só nesse caso o número pode ser trocado.
+  const fichaLocked = Boolean(customer) && !customer?.ficha_released;
+
   const initialNeedsTerms = initialPaymentMethod === "fiado" || initialPaymentMethod === "parcelado";
 
   return (
@@ -102,13 +105,17 @@ export function CustomerForm({
               step="1"
               inputMode="numeric"
               required
-              readOnly={Boolean(customer)}
-              className={`input-field font-semibold ${customer ? "cursor-not-allowed bg-slate-50 text-slate-500" : ""}`}
+              readOnly={fichaLocked}
+              className={`input-field font-semibold ${fichaLocked ? "cursor-not-allowed bg-slate-50 text-slate-500" : ""}`}
               placeholder="Ex.: 25"
               defaultValue={customer?.ficha_number ?? ""}
             />
             <p className="mt-1 text-[11px] text-slate-400">
-              {customer ? "O número fica travado após o cadastro." : "Use uma ficha de #1 a #1000. A numeração pode se repetir em colaboradores diferentes."}
+              {!customer
+                ? "Use uma ficha de #1 a #1000. Números de clientes que já quitaram tudo podem ser reutilizados."
+                : fichaLocked
+                  ? "O número fica travado enquanto o cliente tiver valores em aberto."
+                  : "Cliente quitado: a ficha está liberada e o número pode ser trocado."}
             </p>
           </div>
 

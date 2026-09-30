@@ -39,6 +39,7 @@ export async function createSale(input: SaleInput): Promise<{ id?: string; error
   if (error) {
     const message = error.message || "";
     if (message.includes("Estoque insuficiente")) return { error: message };
+    if (message.includes("já está em uso por outro cliente")) return { error: message };
     if (message.includes("Entrada")) return { error: message };
     return { error: "Não foi possível concluir a venda. Revise os dados e tente novamente." };
   }
