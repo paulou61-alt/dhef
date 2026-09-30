@@ -16,6 +16,8 @@ type Props = {
   hasCustomer: boolean;
   blocked: boolean;
   success: boolean;
+  /** Assinou com Pix durante o teste grátis: a primeira fatura chega quando o teste acabar. */
+  pixScheduled?: boolean;
   prices: Record<string, number>;
 };
 
@@ -35,27 +37,32 @@ async function postForUrl(path: string, body?: unknown) {
 
 export function PlansView(props: Props) {
   const [interval, setInterval] = useState<BillingInterval>(props.currentInterval === "anual" ? "anual" : "mensal");
+  const [method, setMethod] = useState<"cartao" | "pix">("cartao");
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const subscribed = props.status ? SUBSCRIBED_STATUSES.has(props.status) : false;
   const router = useRouter();
   const [confirmationTimedOut, setConfirmationTimedOut] = useState(false);
   const waitingConfirmation = props.success && !subscribed && !confirmationTimedOut;
+  // Assinatura por Pix criada, mas a primeira fatura ainda não foi paga.
+  const awaitingPix = props.status === "incomplete";
 
   // Depois do pagamento, o Stripe avisa o sistema em alguns segundos: recarrega os dados até a assinatura aparecer.
+  // Para o Pix, a pessoa paga em outra aba, então esperamos mais tempo.
   useEffect(() => {
-    if (!waitingConfirmation) return;
+    if (!waitingConfirmation && !awaitingPix) return;
+    const maxAttempts = awaitingPix ? 60 : 10;
     let attempts = 0;
     const timer = window.setInterval(() => {
       attempts += 1;
       router.refresh();
-      if (attempts >= 10) {
+      if (attempts >= maxAttempts) {
         window.clearInterval(timer);
-        setConfirmationTimedOut(true);
+        if (!awaitingPix) setConfirmationTimedOut(true);
       }
-    }, 3000);
+    }, awaitingPix ? 5000 : 3000);
     return () => window.clearInterval(timer);
-  }, [waitingConfirmation, router]);
+  }, [waitingConfirmation, awaitingPix, router]);
 
   async function go(key: string, path: string, body?: unknown) {
     setError(null);
@@ -86,7 +93,32 @@ export function PlansView(props: Props) {
               : "Pagamento recebido, mas a confirmação ainda não chegou. Atualize a página em alguns minutos; se continuar assim, fale com o suporte."}
         </StatusBox>
       )}
-      {props.blocked && !props.success && (
+      {awaitingPix && (
+        <div className="mx-auto max-w-3xl rounded-2xl border border-brand-200 bg-brand-50 px-4 py-4 text-sm">
+          <div className="flex items-start gap-3">
+            <Clock size={20} className="mt-0.5 flex-none text-brand-600" />
+            <div className="min-w-0 flex-1 text-slate-700">
+              <p className="font-semibold text-slate-900">Aguardando o pagamento do Pix</p>
+              <p className="mt-1">Assim que o Pix for pago, sua assinatura é ativada automaticamente (normalmente em menos de 1 minuto). A fatura também foi enviada para o seu e-mail.</p>
+              <button
+                type="button"
+                onClick={() => go("pending", "/api/stripe/pending-invoice")}
+                disabled={loading !== null}
+                className="btn-primary mt-3 inline-flex !w-auto items-center justify-center gap-2 px-5"
+              >
+                {loading === "pending" && <Loader2 size={16} className="animate-spin" />}
+                Abrir fatura do Pix
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {props.pixScheduled && (
+        <StatusBox tone="success" icon={<CheckCircle2 size={20} />}>
+          Assinatura com Pix confirmada! Você continua no teste grátis e recebe a primeira fatura por e-mail quando ele acabar.
+        </StatusBox>
+      )}
+      {props.blocked && !props.success && !awaitingPix && (
         <StatusBox tone="danger" icon={<AlertTriangle size={20} />}>
           {props.status === "trial"
             ? "Seu teste grátis terminou. Escolha um plano para continuar usando o Cobrei. Seus dados estão guardados."
@@ -150,6 +182,26 @@ export function PlansView(props: Props) {
             ))}
           </div>
 
+          <div className="mx-auto max-w-md text-center">
+            <div className="mx-auto flex w-fit rounded-2xl bg-slate-100 p-1.5">
+              {([["cartao", "Cartão de crédito"], ["pix", "Pix"]] as const).map(([option, label]) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => setMethod(option)}
+                  className={`rounded-xl px-5 py-2 text-sm font-bold transition ${method === option ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-slate-500">
+              {method === "pix"
+                ? `Você recebe uma fatura por e-mail a cada ${interval === "mensal" ? "mês" : "ano"} e paga pelo Pix em até 3 dias. Sem pagamento, o acesso é suspenso.`
+                : "Cobrança automática no cartão. Cancele quando quiser."}
+            </p>
+          </div>
+
           <div className="grid gap-4 md:grid-cols-3">
             {PLANS.map((plan) => {
               const price = priceOf(plan);
@@ -192,12 +244,12 @@ export function PlansView(props: Props) {
                   </ul>
                   <button
                     type="button"
-                    onClick={() => go(key, "/api/stripe/checkout", { plan: plan.id, interval })}
+                    onClick={() => go(key, method === "pix" ? "/api/stripe/pix" : "/api/stripe/checkout", { plan: plan.id, interval })}
                     disabled={loading !== null}
                     className={`mt-5 inline-flex w-full items-center justify-center gap-2 ${plan.highlight ? "btn-primary" : "btn-secondary"}`}
                   >
                     {loading === key && <Loader2 size={16} className="animate-spin" />}
-                    Assinar {plan.name}
+                    Assinar {plan.name}{method === "pix" ? " com Pix" : ""}
                   </button>
                 </div>
               );
@@ -218,7 +270,7 @@ export function PlansView(props: Props) {
       {error && <p className="mx-auto max-w-md rounded-xl bg-danger/10 px-4 py-3 text-center text-sm text-danger">{error}</p>}
 
       <p className="text-center text-xs text-slate-400">
-        Pagamento seguro processado pelo Stripe. Cancele quando quiser. Mais de 30 colaboradores? Fale com a gente.
+        Pagamento seguro processado pelo Stripe, no cartão ou no Pix. Cancele quando quiser. Mais de 30 colaboradores? Fale com a gente.
       </p>
     </div>
   );
