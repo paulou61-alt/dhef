@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { MailCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { ResendConfirmation } from "@/components/auth/ResendConfirmation";
 import { BrandMark } from "@/components/brand/BrandMark";
 
 // E-mails deste domínio são usados internamente para o login dos colaboradores.
@@ -85,7 +86,10 @@ export default function CadastroPage() {
             Enviamos um link de confirmação para <span className="font-semibold text-slate-700">{sentTo}</span>.
             Abra o link <strong>neste mesmo aparelho</strong> para ativar sua conta.
           </p>
-          <p className="mt-3 text-xs text-slate-400">Não chegou? Veja a caixa de spam ou promoções.</p>
+          <p className="mt-3 text-xs text-slate-400">Pode levar alguns minutos. Veja também o spam e a aba Promoções.</p>
+          <div className="mt-4">
+            <ResendConfirmation email={sentTo} startWithCooldown />
+          </div>
           <Link href="/login" className="btn-secondary mt-6 inline-flex w-full items-center justify-center">Voltar para o login</Link>
         </div>
       </div>
