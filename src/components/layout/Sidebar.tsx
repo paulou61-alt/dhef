@@ -1,38 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { clsx } from "clsx";
 import { LogOut, Sparkles } from "lucide-react";
 import { getMainNav, getSecondaryNav } from "@/lib/nav-items";
 import type { AppRole } from "@/lib/access";
 import type { ViewPermission } from "@/lib/permissions";
-import { createClient } from "@/lib/supabase/client";
-import { clearOfflineStorage, listOfflineOperations } from "@/lib/offline/db";
+import { useLogout } from "@/lib/use-logout";
 
 const ROLE_LABELS: Record<AppRole, string> = { owner: "Proprietário", vendedor: "Vendedor", cobrador: "Cobrador" };
 
 export function Sidebar({ role, displayName, viewPermissions = [] }: { role: AppRole; displayName?: string | null; viewPermissions?: ViewPermission[] }) {
   const pathname = usePathname();
-  const router = useRouter();
-  const supabase = createClient();
   const mainNav = getMainNav(role, viewPermissions);
   const secondaryNav = getSecondaryNav(role);
-
-  async function handleLogout() {
-    const operations = await listOfflineOperations().catch(() => []);
-    if (operations.length > 0) {
-      window.alert(
-        `Existem ${operations.length} alteração${operations.length === 1 ? "" : "ões"} ainda não sincronizada${operations.length === 1 ? "" : "s"}. Conecte-se à internet e aguarde a sincronização antes de sair da conta para não perder esses dados.`
-      );
-      return;
-    }
-
-    await clearOfflineStorage().catch(() => undefined);
-    await supabase.auth.signOut();
-    router.push("/login");
-    router.refresh();
-  }
+  const handleLogout = useLogout();
 
   const renderLink = (item: (typeof mainNav)[number]) => {
     const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);

@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { Menu, X } from "lucide-react";
+import { LogOut, Menu, X } from "lucide-react";
 import { ALL_NAV, getMobileSecondaryNav } from "@/lib/nav-items";
 import type { AppRole } from "@/lib/access";
+import { useLogout } from "@/lib/use-logout";
 
 function getTitle(pathname: string): string {
   const all = [...ALL_NAV].sort((a, b) => b.href.length - a.href.length);
@@ -17,6 +18,7 @@ export function Header({ role }: { role: AppRole }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const secondaryItems = getMobileSecondaryNav(role);
+  const logout = useLogout();
 
   useEffect(() => {
     setOpen(false);
@@ -34,7 +36,7 @@ export function Header({ role }: { role: AppRole }) {
             </div>
           </div>
 
-          {secondaryItems.length > 0 && (
+          {secondaryItems.length > 0 ? (
             <button
               type="button"
               onClick={() => setOpen((value) => !value)}
@@ -43,6 +45,15 @@ export function Header({ role }: { role: AppRole }) {
               aria-expanded={open}
             >
               {open ? <X size={20} /> : <Menu size={20} />}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={logout}
+              className="flex h-10 flex-none items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-600 shadow-sm"
+              aria-label="Sair da conta"
+            >
+              <LogOut size={16} /> Sair
             </button>
           )}
         </div>
@@ -94,6 +105,14 @@ export function Header({ role }: { role: AppRole }) {
                 );
               })}
             </div>
+
+            <button
+              type="button"
+              onClick={logout}
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 px-3 py-3 text-[13px] font-bold text-slate-600"
+            >
+              <LogOut size={17} /> Sair da conta
+            </button>
           </div>
         </div>
       )}

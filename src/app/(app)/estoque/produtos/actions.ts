@@ -3,6 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getAccessContext } from "@/lib/access";
+
+// Server Actions podem ser chamadas diretamente; o menu não basta para restringir o acesso.
+async function isOwner() {
+  const access = await getAccessContext();
+  return access?.role === "owner";
+}
 
 export interface ProductFormState {
   error?: string;
@@ -30,6 +37,7 @@ export async function createProduct(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Sessão expirada. Faça login novamente." };
+  if (!(await isOwner())) return { error: "Apenas o proprietário pode alterar o estoque." };
 
   const name = (formData.get("name") as string)?.trim();
   if (!name) return { error: "O nome do produto é obrigatório." };
@@ -87,6 +95,7 @@ export async function updateProduct(productId: string, formData: FormData): Prom
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Sessão expirada." };
+  if (!(await isOwner())) return { error: "Apenas o proprietário pode alterar o estoque." };
 
   const name = (formData.get("name") as string)?.trim();
   if (!name) return { error: "O nome do produto é obrigatório." };
@@ -120,6 +129,7 @@ export async function deleteProduct(productId: string): Promise<{ error?: string
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Sessão expirada." };
+  if (!(await isOwner())) return { error: "Apenas o proprietário pode alterar o estoque." };
 
   const { error } = await supabase.from("products").delete().eq("id", productId).eq("user_id", user.id);
 
@@ -140,6 +150,7 @@ export async function addVariant(productId: string, variant: VariantInput): Prom
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Sessão expirada." };
+  if (!(await isOwner())) return { error: "Apenas o proprietário pode alterar o estoque." };
 
   const { error } = await supabase.from("product_variants").insert({
     user_id: user.id,
@@ -164,6 +175,7 @@ export async function deleteVariant(productId: string, variantId: string): Promi
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Sessão expirada." };
+  if (!(await isOwner())) return { error: "Apenas o proprietário pode alterar o estoque." };
 
   const { error } = await supabase
     .from("product_variants")
