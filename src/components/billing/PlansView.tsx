@@ -34,7 +34,7 @@ async function postForUrl(path: string, body?: unknown) {
     body: JSON.stringify(body ?? {}),
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok || !data.url) throw new Error(data.error || "Não foi possível abrir o pagamento.");
+  if (!response.ok || !data.url) throw new Error(data.error || `Não foi possível abrir o pagamento (erro ${response.status}).`);
   return data.url as string;
 }
 

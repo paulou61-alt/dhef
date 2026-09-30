@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAccessContext } from "@/lib/access";
 import { createClient } from "@/lib/supabase/server";
 import { appUrl, getStripe, getSupabaseAdmin } from "@/lib/billing/stripe";
+import { billingErrorResponse } from "@/lib/billing/errors";
 import { lookupKey, type BillingInterval, type PlanId } from "@/lib/billing/plans";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +13,14 @@ const INTERVALS = new Set(["mensal", "anual"]);
 const MIN_TRIAL_MS = 49 * 60 * 60 * 1000;
 
 export async function POST(request: Request) {
+  try {
+    return await handle(request);
+  } catch (error) {
+    return billingErrorResponse("checkout", error);
+  }
+}
+
+async function handle(request: Request) {
   const access = await getAccessContext();
   if (!access || access.role !== "owner") {
     return NextResponse.json({ error: "Apenas o proprietário pode assinar um plano." }, { status: 403 });

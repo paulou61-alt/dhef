@@ -1,11 +1,20 @@
 import { NextResponse } from "next/server";
 import { getAccessContext } from "@/lib/access";
 import { appUrl, getStripe, getSupabaseAdmin } from "@/lib/billing/stripe";
+import { billingErrorResponse } from "@/lib/billing/errors";
 
 export const dynamic = "force-dynamic";
 
 // Abre o portal do Stripe, onde o cliente troca de plano, atualiza o cartão ou cancela.
 export async function POST(request: Request) {
+  try {
+    return await handle(request);
+  } catch (error) {
+    return billingErrorResponse("portal", error);
+  }
+}
+
+async function handle(request: Request) {
   const access = await getAccessContext();
   if (!access || access.role !== "owner") {
     return NextResponse.json({ error: "Apenas o proprietário pode gerenciar a assinatura." }, { status: 403 });
