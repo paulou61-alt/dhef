@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "@/lib/supabase/config";
 import { getAccessContext } from "@/lib/access";
+import { collaboratorLimit, getSubscription } from "@/lib/billing/subscription";
 import { getDefaultViewPermissions, normalizeViewPermissions, type ViewPermission } from "@/lib/permissions";
 
 export interface CreateCollaboratorInput {
@@ -80,6 +81,20 @@ export async function createCollaborator(
   }
 
   const supabase = createClient();
+
+  // Limite de colaboradores do plano contratado.
+  const limit = collaboratorLimit(await getSubscription(access));
+  if (Number.isFinite(limit)) {
+    const { count } = await supabase
+      .from("collaborators")
+      .select("id", { count: "exact", head: true })
+      .eq("owner_id", access.ownerId)
+      .eq("is_active", true);
+    if ((count ?? 0) >= limit) {
+      return { error: `Seu plano permite até ${limit} colaboradores ativos. Mude de plano em "Plano" para cadastrar mais.` };
+    }
+  }
+
   const { error } = await supabase.from("collaborators").insert({
     owner_id: access.ownerId,
     name,

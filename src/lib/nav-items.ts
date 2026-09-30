@@ -11,6 +11,7 @@ import {
   UserRoundCog,
   BadgeDollarSign,
   HandCoins,
+  CreditCard,
   type LucideIcon,
 } from "lucide-react";
 import type { AppRole } from "@/lib/access";
@@ -38,6 +39,7 @@ const OWNER_SECONDARY: NavItem[] = [
   { href: "/despesas", label: "Despesas", icon: Receipt },
   { href: "/financeiro", label: "Financeiro", icon: Wallet },
   { href: "/relatorios", label: "Relatórios", icon: LineChart },
+  { href: "/planos", label: "Plano", icon: CreditCard },
   { href: "/configuracoes", label: "Configurações", icon: Settings },
 ];
 
