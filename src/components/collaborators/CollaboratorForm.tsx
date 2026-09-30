@@ -12,7 +12,7 @@ import {
   type ViewPermission,
 } from "@/lib/permissions";
 
-export function CollaboratorForm() {
+export function CollaboratorForm({ canCustomizePermissions = true }: { canCustomizePermissions?: boolean }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [role, setRole] = useState<CollaboratorRole>("vendedor");
@@ -85,6 +85,7 @@ export function CollaboratorForm() {
           <input className="input-field" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Opcional" />
         </div>
 
+        {canCustomizePermissions ? (
         <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
           <div className="mb-3 flex items-start gap-2">
             <span className="mt-0.5 flex h-8 w-8 flex-none items-center justify-center rounded-xl bg-brand-50 text-brand-600"><Eye size={16} /></span>
@@ -117,6 +118,12 @@ export function CollaboratorForm() {
             })}
           </div>
         </div>
+
+        ) : (
+          <p className="md:col-span-2 rounded-xl bg-slate-50 px-3 py-2.5 text-xs text-slate-500">
+            O colaborador verá as áreas padrão da função. Escolher o que cada um vê está disponível no plano Equipe.
+          </p>
+        )}
 
         {error && <p className="md:col-span-2 rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
         {success && <p className="md:col-span-2 rounded-xl bg-success/10 px-3 py-2 text-sm font-medium text-success">{success}</p>}

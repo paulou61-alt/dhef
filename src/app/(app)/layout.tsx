@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getSubscription, hasAccess, trialDaysLeft } from "@/lib/billing/subscription";
+import { getSubscription, hasAccess, planFeatures, planSummary, trialDaysLeft } from "@/lib/billing/subscription";
+import { ALL_FEATURES } from "@/lib/billing/plans";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { Header } from "@/components/layout/Header";
@@ -15,13 +16,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const subscription = await getSubscription(access);
   if (!hasAccess(subscription)) redirect("/planos");
   const daysLeft = access.role === "owner" ? trialDaysLeft(subscription) : null;
+  const features = planFeatures(subscription);
+  const lockedFeatures = ALL_FEATURES.filter((feature) => !features.has(feature));
+  const plan = access.role === "owner" ? planSummary(subscription) : null;
 
   return (
     <div className="min-h-dvh bg-[radial-gradient(circle_at_top_right,_rgba(47,91,246,0.07),_transparent_28%),linear-gradient(to_bottom,_#f8fafc,_#f5f7fb)]">
-      <Sidebar role={access.role} displayName={access.name} viewPermissions={access.viewPermissions} />
+      <Sidebar role={access.role} displayName={access.name} viewPermissions={access.viewPermissions} lockedFeatures={lockedFeatures} plan={plan} />
       <OfflineStatus userId={access.userId} />
       <div className="md:pl-64">
-        <Header role={access.role} />
+        <Header role={access.role} lockedFeatures={lockedFeatures} />
         {daysLeft !== null && (
           <Link
             href="/planos"

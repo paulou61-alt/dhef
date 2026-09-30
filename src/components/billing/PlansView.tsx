@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Check, CheckCircle2, Clock, CreditCard, Loader2 } from "lucide-react";
-import { PLANS, lookupKey, type BillingInterval, type PlanId } from "@/lib/billing/plans";
+import { AlertTriangle, Check, CheckCircle2, Clock, CreditCard, Loader2, Minus } from "lucide-react";
+import { ALL_FEATURES, BASE_FEATURES, FEATURE_LABELS, PLANS, lookupKey, type BillingInterval, type PlanId } from "@/lib/billing/plans";
 import { formatCurrency, formatDate } from "@/utils/format";
 
 type Props = {
@@ -19,12 +19,6 @@ type Props = {
   prices: Record<string, number>;
 };
 
-const FEATURES = [
-  "Fichas numeradas e clientes ilimitados",
-  "Vendas, recebimentos e cobrança no WhatsApp",
-  "Modo offline para a equipe na rua",
-  "Relatórios e controle de vales",
-];
 
 const SUBSCRIBED_STATUSES = new Set(["active", "trialing", "past_due"]);
 
@@ -80,7 +74,7 @@ export function PlansView(props: Props) {
     <div className="space-y-6">
       <div className="text-center">
         <h1 className="text-2xl font-bold text-slate-900 md:text-3xl">Escolha o plano do seu negócio</h1>
-        <p className="mt-2 text-sm text-slate-500">Todos os planos têm todas as funções. A diferença é o tamanho da equipe.</p>
+        <p className="mt-2 text-sm text-slate-500">Comece pelo essencial e evolua conforme o negócio cresce. Troque de plano quando quiser.</p>
       </div>
 
       {props.success && (
@@ -181,11 +175,20 @@ export function PlansView(props: Props) {
                     Dono + até {plan.collaboratorLimit} colaboradores
                   </p>
                   <ul className="mt-4 flex-1 space-y-2">
-                    {FEATURES.map((feature) => (
+                    {BASE_FEATURES.map((feature) => (
                       <li key={feature} className="flex items-start gap-2 text-sm text-slate-600">
                         <Check size={16} className="mt-0.5 flex-none text-success" /> {feature}
                       </li>
                     ))}
+                    {ALL_FEATURES.map((feature) => {
+                      const included = plan.features.includes(feature);
+                      return (
+                        <li key={feature} className={`flex items-start gap-2 text-sm ${included ? "text-slate-600" : "text-slate-300 line-through decoration-slate-200"}`}>
+                          {included ? <Check size={16} className="mt-0.5 flex-none text-success" /> : <Minus size={16} className="mt-0.5 flex-none" />}
+                          {FEATURE_LABELS[feature]}
+                        </li>
+                      );
+                    })}
                   </ul>
                   <button
                     type="button"

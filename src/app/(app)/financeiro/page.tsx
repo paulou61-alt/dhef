@@ -1,10 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
+import { featureGate } from "@/lib/billing/gate";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { formatCurrency, formatDateTime } from "@/utils/format";
 
 export const dynamic = "force-dynamic";
 
 export default async function FinanceiroPage() {
+  const gate = await featureGate("financeiro");
+  if (gate) return gate;
+
   const supabase = createClient();
   const [{ data: movements }, { data: allMovements }, { data: installments }, { data: saleItems }] = await Promise.all([
     // A lista mostra só as 200 mais recentes; os totais usam todas as movimentações.

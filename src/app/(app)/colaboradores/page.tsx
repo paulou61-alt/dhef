@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { UserRoundCog } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAll } from "@/lib/supabase/fetch-all";
+import { getSubscription, planFeatures } from "@/lib/billing/subscription";
 import { getAccessContext } from "@/lib/access";
 import { CollaboratorForm } from "@/components/collaborators/CollaboratorForm";
 import { CollaboratorProfileCard } from "@/components/collaborators/CollaboratorProfileCard";
@@ -28,6 +29,7 @@ export default async function ColaboradoresPage() {
   if (access.role !== "owner") redirect("/login");
 
   const supabase = createClient();
+  const features = planFeatures(await getSubscription(access));
   const [collaboratorsResult, customersResult, salesResult, paymentsResult, valesResult] = await Promise.all([
     supabase
       .from("collaborators")
@@ -114,7 +116,7 @@ export default async function ColaboradoresPage() {
         <p className="mt-1 text-sm text-slate-500">Gerencie a equipe, as visualizações, vendas e vales de cada colaborador.</p>
       </div>
 
-      <CollaboratorForm />
+      <CollaboratorForm canCustomizePermissions={features.has("permissoes")} />
 
       <div className="card !p-0">
         <div className="border-b border-slate-100 px-4 py-3">
@@ -150,6 +152,8 @@ export default async function ColaboradoresPage() {
                     collectionsTotal={collectionTotals.get(collaborator.id) ?? 0}
                     valeBalance={valeBalances.get(collaborator.id) ?? 0}
                     valeMovements={valesByCollaborator.get(collaborator.id) ?? []}
+                    valesEnabled={features.has("vales")}
+                    permissionsEnabled={features.has("permissoes")}
                     actions={
                       <>
                         <EditCollaboratorButton collaborator={editable} />

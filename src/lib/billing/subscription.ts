@@ -1,8 +1,8 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
-import type { AccessContext } from "@/lib/access";
-import { PLANS, TRIAL_COLLABORATOR_LIMIT, type PlanId } from "@/lib/billing/plans";
+import { ALL_FEATURES, PLANS, TRIAL_COLLABORATOR_LIMIT, type Feature, type PlanId } from "@/lib/billing/plans";
+import { getAccessContext, type AccessContext } from "@/lib/access";
 
 export interface Subscription {
   owner_id: string;
@@ -58,4 +58,48 @@ export function collaboratorLimit(subscription: Subscription | null) {
   if (!subscription || subscription.status === "cortesia") return Infinity;
   if (subscription.status === "trial") return TRIAL_COLLABORATOR_LIMIT;
   return PLANS.find((plan) => plan.id === subscription.plan)?.collaboratorLimit ?? TRIAL_COLLABORATOR_LIMIT;
+}
+
+/** Recursos liberados para a empresa. Teste grátis e cortesia têm tudo. */
+export function planFeatures(subscription: Subscription | null): Set<Feature> {
+  if (!subscription || subscription.status === "cortesia" || subscription.status === "trial") return new Set(ALL_FEATURES);
+  const plan = PLANS.find((item) => item.id === subscription.plan);
+  return new Set(plan ? plan.features : ALL_FEATURES);
+}
+
+/** Confere na hora (em Server Actions e rotas) se a empresa de quem está logado tem o recurso. */
+export async function companyHasFeature(feature: Feature) {
+  const access = await getAccessContext();
+  if (!access) return false;
+  return planFeatures(await getSubscription(access)).has(feature);
+}
+
+/** Resumo do plano para o menu e as Configurações. */
+export function planSummary(subscription: Subscription | null): { label: string; hint: string | null; tone: "brand" | "warning" | "success" } | null {
+  if (!subscription) return null;
+  const date = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" }) : null);
+  const name = PLANS.find((plan) => plan.id === subscription.plan)?.name;
+
+  switch (subscription.status) {
+    case "cortesia":
+      return { label: "Acesso cortesia", hint: "Sem cobrança", tone: "success" };
+    case "trial": {
+      const days = trialDaysLeft(subscription) ?? 0;
+      return { label: "Teste grátis", hint: `${days === 1 ? "Falta 1 dia" : `Faltam ${days} dias`} · Assinar`, tone: days <= 2 ? "warning" : "brand" };
+    }
+    case "past_due":
+      return { label: "Pagamento pendente", hint: "Atualize a forma de pagamento", tone: "warning" };
+    case "active":
+    case "trialing": {
+      const end = date(subscription.current_period_end);
+      const hint = subscription.cancel_at_period_end
+        ? `Cancelado · acesso até ${end}`
+        : subscription.status === "trialing"
+          ? `Primeira cobrança em ${end}`
+          : `Renova em ${end}`;
+      return { label: `Plano ${name ?? "ativo"}`, hint: end ? hint : null, tone: subscription.cancel_at_period_end ? "warning" : "brand" };
+    }
+    default:
+      return { label: "Assinatura inativa", hint: "Escolha um plano", tone: "warning" };
+  }
 }

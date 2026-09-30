@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "@/lib/supabase/config";
 import { getAccessContext } from "@/lib/access";
-import { collaboratorLimit, getSubscription } from "@/lib/billing/subscription";
+import { collaboratorLimit, companyHasFeature, getSubscription } from "@/lib/billing/subscription";
 import { getDefaultViewPermissions, normalizeViewPermissions, type ViewPermission } from "@/lib/permissions";
 
 export interface CreateCollaboratorInput {
@@ -75,7 +75,11 @@ export async function createCollaborator(
   const name = input.name.trim();
   if (!name) return { error: "Informe o nome do colaborador." };
 
-  const permissions = normalizeViewPermissions(input.role, input.viewPermissions);
+  // Sem o recurso de permissões, o colaborador recebe as visualizações padrão da função.
+  const canCustomize = await companyHasFeature("permissoes");
+  const permissions = canCustomize
+    ? normalizeViewPermissions(input.role, input.viewPermissions)
+    : getDefaultViewPermissions(input.role);
   if (permissions.length === 0) {
     return { error: "Selecione pelo menos uma área que o colaborador pode visualizar." };
   }
@@ -228,6 +232,8 @@ export async function updateCollaboratorPermissions(
   if (!access || access.role !== "owner") {
     return { error: "Apenas o proprietário pode alterar permissões." };
   }
+  if (!(await companyHasFeature("permissoes"))) return { error: "Escolher o que cada colaborador vê está disponível no plano Equipe." };
+
 
   const supabase = createClient();
   const { data: collaborator } = await supabase
@@ -281,6 +287,7 @@ export async function addCollaboratorValeMovement(
 ): Promise<{ error?: string; success?: boolean }> {
   const access = await getAccessContext();
   if (!access || access.role !== "owner") return { error: "Apenas o proprietário pode movimentar vales." };
+  if (!(await companyHasFeature("vales"))) return { error: "O controle de vales está disponível a partir do plano Profissional." };
 
   const collaboratorId = input.collaboratorId?.trim();
   const amount = Number(input.amount);
@@ -316,6 +323,8 @@ export async function updateCollaboratorValeMovement(
   if (!access || access.role !== "owner") {
     return { error: "Apenas o proprietário pode editar lançamentos de vale." };
   }
+  if (!(await companyHasFeature("vales"))) return { error: "O controle de vales está disponível a partir do plano Profissional." };
+
 
   const movementId = input.movementId?.trim();
   const collaboratorId = input.collaboratorId?.trim();
@@ -357,6 +366,8 @@ export async function deleteCollaboratorValeMovement(input: {
   if (!access || access.role !== "owner") {
     return { error: "Apenas o proprietário pode apagar lançamentos de vale." };
   }
+  if (!(await companyHasFeature("vales"))) return { error: "O controle de vales está disponível a partir do plano Profissional." };
+
 
   const movementId = input.movementId?.trim();
   const collaboratorId = input.collaboratorId?.trim();
@@ -386,6 +397,7 @@ export async function setCollaboratorValeBalance(input: {
 }): Promise<{ error?: string; success?: boolean }> {
   const access = await getAccessContext();
   if (!access || access.role !== "owner") return { error: "Apenas o proprietário pode editar o saldo em vale." };
+  if (!(await companyHasFeature("vales"))) return { error: "O controle de vales está disponível a partir do plano Profissional." };
 
   const collaboratorId = input.collaboratorId?.trim();
   const targetBalance = Number(input.balance);

@@ -18,6 +18,10 @@ type Props = {
   salesCount: number;
   collectionsTotal: number;
   valeBalance: number;
+  /** Plano inclui controle de vales. */
+  valesEnabled?: boolean;
+  /** Plano permite escolher o que cada colaborador vê. */
+  permissionsEnabled?: boolean;
   valeMovements: ValeMovement[];
   username?: string | null;
   actions?: ReactNode;
@@ -25,7 +29,7 @@ type Props = {
 
 const ROLE_LABELS: Record<Role, string> = { vendedor: "Vendedor", cobrador: "Cobrador" };
 
-export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissions, salesCount, collectionsTotal, valeBalance, valeMovements, username, actions }: Props) {
+export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissions, salesCount, collectionsTotal, valeBalance, valeMovements, username, actions, valesEnabled = true, permissionsEnabled = true }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"vale" | "abatimento" | null>(null);
@@ -170,10 +174,12 @@ export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissio
           <p className="truncate text-xs text-slate-500">{ROLE_LABELS[collaborator.role]}{collaborator.phone ? ` · ${collaborator.phone}` : ""}</p>
           <p className="mt-0.5 text-[11px] font-medium text-brand-600">Ver vendas, vales e permissões ›</p>
         </div>
+        {valesEnabled && (
         <div className="flex-none text-right">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Saldo de vale</p>
           <p className={`text-sm font-bold ${valeBalance < 0 ? "text-danger" : valeBalance > 0 ? "text-success" : "text-slate-500"}`}>{formatCurrency(valeBalance)}</p>
         </div>
+        )}
       </button>
 
       <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
@@ -203,6 +209,7 @@ export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissio
         <div className="space-y-5 p-5">
           <div className="grid grid-cols-2 gap-3">
             <Metric icon={<ShoppingBag size={15} />} label="Vendas atribuídas" value={String(salesCount)} helper="Sem exibir valor financeiro" />
+            {valesEnabled && (
             <div className={`rounded-2xl border p-3.5 ${valeBalance < 0 ? "border-red-200 bg-red-50" : valeBalance > 0 ? "border-emerald-200 bg-emerald-50" : "border-slate-100 bg-slate-50"}`}>
               <div className={`flex items-center justify-between gap-2 text-xs font-semibold ${valeBalance < 0 ? "text-red-700" : valeBalance > 0 ? "text-emerald-700" : "text-slate-500"}`}>
                 <span className="flex items-center gap-2"><HandCoins size={15} />Saldo de vale</span>
@@ -227,8 +234,9 @@ export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissio
                 <><p className={`mt-2 text-lg font-bold ${valeBalance < 0 ? "text-red-800" : valeBalance > 0 ? "text-emerald-800" : "text-slate-900"}`}>{formatCurrency(valeBalance)}</p><p className="mt-0.5 text-[11px] text-slate-500">Vale entra negativo; Saldo entra positivo.</p></>
               )}
             </div>
+            )}
             <Metric icon={<ReceiptText size={15} />} label="Recebido em cobranças" value={formatCurrency(collectionsTotal)} />
-            <Metric icon={<Banknote size={15} />} label="Movimentações de vale" value={String(valeMovements.length)} />
+            {valesEnabled && <Metric icon={<Banknote size={15} />} label="Movimentações de vale" value={String(valeMovements.length)} />}
           </div>
 
           <section className="rounded-2xl border border-slate-200 p-4">
@@ -236,22 +244,26 @@ export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissio
             <div className="grid gap-2 sm:grid-cols-2">
               {allowedPermissions.map((permission) => {
                 const selected = permissions.includes(permission); const info = VIEW_PERMISSION_LABELS[permission];
-                return <button key={permission} type="button" onClick={() => togglePermission(permission)} className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left ${selected ? "border-brand-200 bg-brand-50" : "border-slate-200 bg-white"}`}>
+                return <button key={permission} type="button" disabled={!permissionsEnabled} onClick={() => togglePermission(permission)} className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left disabled:cursor-not-allowed disabled:opacity-60 ${selected ? "border-brand-200 bg-brand-50" : "border-slate-200 bg-white"}`}>
                   <span className={`flex h-6 w-6 flex-none items-center justify-center rounded-lg border ${selected ? "border-brand-500 bg-brand-500 text-white" : "border-slate-300 text-transparent"}`}><Check size={14} strokeWidth={3} /></span>
                   <span><span className="block text-sm font-semibold text-slate-800">{info.label}</span><span className="block text-[11px] text-slate-500">{info.description}</span></span>
                 </button>;
               })}
             </div>
+            {!permissionsEnabled && <p className="mt-3 text-xs text-slate-500">Escolher o que cada colaborador vê está disponível no plano Equipe. <a href="/planos" className="font-semibold text-brand-600">Ver planos</a></p>}
             {permissionsChanged && <div className="mt-3 flex justify-end"><button type="button" disabled={pending} onClick={savePermissions} className="btn-primary !w-auto px-4 py-2 text-xs">{pending ? "Salvando..." : "Salvar visualizações"}</button></div>}
           </section>
 
+          {valesEnabled && (
           <section className="rounded-2xl border border-slate-100 p-4">
             <div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="text-sm font-bold text-slate-900">Vale do colaborador</h3><p className="text-xs text-slate-500">Vale reduz o saldo; Saldo aumenta o valor.</p></div><div className="flex gap-2"><button type="button" onClick={() => resetVale(mode === "vale" ? null : "vale")} className="inline-flex items-center gap-1 rounded-xl bg-brand-600 px-3 py-2 text-xs font-semibold text-white"><Minus size={14} />Registrar vale</button><button type="button" onClick={() => resetVale(mode === "abatimento" ? null : "abatimento")} className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700"><Plus size={14} />Saldo</button></div></div>
             {mode && <div className="mt-4 rounded-2xl bg-slate-50 p-4"><div className="grid gap-3 sm:grid-cols-2"><div><label className="label">Valor *</label><input type="number" min="0.01" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} className="input-field" placeholder="0,00" /></div><div><label className="label">Data</label><input type="date" value={movementDate} onChange={(e) => setMovementDate(e.target.value)} className="input-field" /></div></div><div className="mt-3"><label className="label">Observação</label><input value={notes} onChange={(e) => setNotes(e.target.value)} className="input-field" placeholder="Opcional" /></div><div className="mt-3 flex justify-end gap-2"><button type="button" onClick={() => resetVale(null)} className="px-3 py-2 text-xs font-semibold text-slate-600">Cancelar</button><button type="button" onClick={submitVale} disabled={pending} className="btn-primary !w-auto px-4 py-2 text-xs">{pending ? "Salvando..." : "Confirmar"}</button></div></div>}
           </section>
+          )}
 
           {(error || success) && <p className={`rounded-xl px-3 py-2 text-sm font-medium ${error ? "bg-danger/10 text-danger" : "bg-success/10 text-success"}`}>{error || success}</p>}
 
+          {valesEnabled ? (
           <section>
             <div className="mb-3 flex items-center justify-between gap-3">
               <h3 className="text-sm font-bold text-slate-900">Histórico de vales</h3>
@@ -399,6 +411,12 @@ export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissio
               </div>
             )}
           </section>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-slate-200 p-4 text-center">
+              <p className="text-sm font-semibold text-slate-700">Controle de vales</p>
+              <p className="mt-1 text-xs text-slate-500">Disponível a partir do plano Profissional. <a href="/planos" className="font-semibold text-brand-600">Ver planos</a></p>
+            </div>
+          )}
         </div>
       </div>
     </div>}
