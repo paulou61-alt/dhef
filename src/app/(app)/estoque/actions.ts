@@ -2,6 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getAccessContext } from "@/lib/access";
+
+// Server Actions podem ser chamadas diretamente; o menu não basta para restringir o acesso.
+async function isOwner() {
+  const access = await getAccessContext();
+  return access?.role === "owner";
+}
 
 export async function adjustStock(
   variantId: string,
@@ -14,6 +21,7 @@ export async function adjustStock(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Sessão expirada." };
+  if (!(await isOwner())) return { error: "Apenas o proprietário pode alterar o estoque." };
 
   if (!quantity || quantity <= 0) {
     return { error: "Informe uma quantidade válida." };
