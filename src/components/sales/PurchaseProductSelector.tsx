@@ -41,20 +41,26 @@ export function PurchaseProductSelector({
   const productById = useMemo(() => new Map(products.map((product) => [product.id, product])), [products]);
   const variantById = useMemo(() => new Map(variants.map((variant) => [variant.id, variant])), [variants]);
 
+  // Variações sem estoque aparecem desativadas, para ficar claro por que não podem ser escolhidas.
   const options = useMemo<SelectOption[]>(
     () => variants
-      .filter((variant) => variant.stock_quantity > 0)
       .map((variant) => {
         const product = productById.get(variant.product_id);
         const price = Number(variant.sale_price ?? product?.sale_price ?? 0);
+        const inStock = variant.stock_quantity > 0;
         return {
           value: variant.id,
           label: `${product?.name ?? "Produto"} — ${variant.variant_name}`,
-          description: `${variant.stock_quantity} em estoque · ${formatCurrency(price)}`,
+          description: inStock
+            ? `${variant.stock_quantity} em estoque · ${formatCurrency(price)}`
+            : `Sem estoque · ${formatCurrency(price)}`,
+          disabled: !inStock,
         };
-      }),
+      })
+      .sort((a, b) => Number(a.disabled) - Number(b.disabled)),
     [variants, productById]
   );
+  const hasStock = options.some((option) => !option.disabled);
 
   const total = items.reduce((sum, item) => {
     const variant = variantById.get(item.variantId);
@@ -116,6 +122,12 @@ export function PurchaseProductSelector({
           <Plus size={18} />
         </button>
       </div>
+
+      {variants.length === 0 ? (
+        <p className="rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800">Nenhum produto cadastrado. Cadastre produtos em Estoque para vendê-los aqui.</p>
+      ) : !hasStock ? (
+        <p className="rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800">Todos os produtos estão sem estoque. Atualize a quantidade em Estoque para poder vendê-los.</p>
+      ) : null}
 
       {items.length === 0 ? (
         <div className={`rounded-xl bg-surface-muted text-center text-sm text-slate-500 ${compact ? "py-4" : "py-6"}`}>
