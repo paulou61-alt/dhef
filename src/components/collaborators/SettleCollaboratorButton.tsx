@@ -136,7 +136,7 @@ export function SettleCollaboratorButton({ collaborator, valeBalance }: { collab
                 <p className="mt-0.5 text-xs text-slate-500">
                   {manual
                     ? "Informe quanto foi pago, sem calcular comissão."
-                    : preview?.periodStart ? `Desde ${formatDate(preview.periodStart)} (depois do último acerto)` : "Desde o início (primeiro acerto)"}
+                    : preview?.periodStart ? `Conta o que entrou depois do último acerto (até ${formatDate(preview.periodStart)})` : "Desde o início (primeiro acerto)"}
                 </p>
               </div>
               <button type="button" onClick={close} className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100" aria-label="Fechar">
@@ -230,7 +230,7 @@ export function SettleCollaboratorButton({ collaborator, valeBalance }: { collab
                 </div>
               ) : null}
 
-              {alreadySettled && <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">Essa data já foi acertada. Escolha a partir de {formatDate(preview!.periodStart!)}.</p>}
+              {alreadySettled && <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">O último acerto foi até {formatDate(preview!.periodStart!)}. Escolha essa data ou uma mais recente.</p>}
               {error && <p className="rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
 
               <p className="text-[11px] leading-4 text-slate-500">
