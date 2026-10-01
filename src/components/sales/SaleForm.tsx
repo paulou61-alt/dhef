@@ -58,14 +58,18 @@ export function SaleForm({
   customers,
   products,
   variants,
+  sellers = [],
 }: {
   customers: Customer[];
   products: Product[];
   variants: Variant[];
+  /** Colaboradores com cargo de vendedor. Só o proprietário recebe a lista. */
+  sellers?: { id: string; name: string }[];
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [customerId, setCustomerId] = useState("");
+  const [sellerId, setSellerId] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("parcelado");
   const [downPayment, setDownPayment] = useState("");
   const [installmentsCount, setInstallmentsCount] = useState("2");
@@ -159,6 +163,7 @@ export function SaleForm({
   function resetForm() {
     setItems([]);
     setCustomerId("");
+    setSellerId("");
     setDownPayment("");
     setNotes("");
     setSelectedVariant(getDefaultVariantId(products, variants));
@@ -176,12 +181,14 @@ export function SaleForm({
         installmentsCount: Number(installmentsCount) || 1,
         firstDueDate,
         notes,
+        ...(sellerId ? { sellerId } : {}),
       };
 
       try {
         const result = await submitOfflineCapableOperation("sale", input);
 
         if (result.synced && result.resultId) {
+          if (result.warning) window.alert(result.warning);
           router.push(`/vender/${result.resultId}`);
           router.refresh();
           return;
@@ -218,6 +225,21 @@ export function SaleForm({
             searchable={customers.length > 6}
             searchPlaceholder="Buscar cliente..."
           />
+          {sellers.length > 0 && (
+            <div className="mt-4">
+              <label className="label">Vendedor responsável</label>
+              <SelectField
+                value={sellerId}
+                onChange={setSellerId}
+                options={[
+                  { value: "", label: "Nenhum", description: "Venda feita por você" },
+                  ...sellers.map((seller) => ({ value: seller.id, label: seller.name, description: "Vendedor" })),
+                ]}
+                searchable={sellers.length > 6}
+                searchPlaceholder="Buscar vendedor..."
+              />
+            </div>
+          )}
         </div>
 
         <div className="card space-y-3">
