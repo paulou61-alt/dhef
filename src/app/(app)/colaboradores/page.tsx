@@ -9,6 +9,7 @@ import { CollaboratorProfileCard } from "@/components/collaborators/Collaborator
 import { CollaboratorAccessButton } from "@/components/collaborators/CollaboratorAccessButton";
 import { CollaboratorSearchList } from "@/components/collaborators/CollaboratorSearchList";
 import { CollectionsByCollector, type CollectionsFilter } from "@/components/collaborators/CollectionsByCollector";
+import { SettleCollaboratorButton } from "@/components/collaborators/SettleCollaboratorButton";
 import { EditCollaboratorButton } from "@/components/collaborators/EditCollaboratorButton";
 import { normalizeViewPermissions } from "@/lib/permissions";
 
@@ -161,6 +162,7 @@ export default async function ColaboradoresPage({ searchParams }: { searchParams
                     permissionsEnabled={features.has("permissoes")}
                     actions={
                       <>
+                        {features.has("vales") && <SettleCollaboratorButton collaborator={{ id: collaborator.id, name: collaborator.name }} />}
                         <EditCollaboratorButton collaborator={editable} />
                         <CollaboratorAccessButton
                           collaboratorId={collaborator.id}
