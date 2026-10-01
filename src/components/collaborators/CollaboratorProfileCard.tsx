@@ -275,6 +275,8 @@ export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissio
               <div className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-100">
                 {recentMovements.map((movement) => {
                   const isVale = movement.movement_type === "vale";
+                  // Valor zero: acerto registrado sem pagamento (só dá para apagar).
+                  const isNote = Number(movement.amount) === 0;
                   const isEditingMovement = editingMovementId === movement.id;
 
                   return (
@@ -346,21 +348,25 @@ export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissio
                         </div>
                       ) : (
                         <div className="flex items-center gap-3">
-                          <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${isVale ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>
-                            {isVale ? <Minus size={16} /> : <Plus size={16} />}
+                          <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${isNote ? "bg-slate-100 text-slate-500" : isVale ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>
+                            {isNote ? <CalendarDays size={16} /> : isVale ? <Minus size={16} /> : <Plus size={16} />}
                           </span>
                           <div className="min-w-0 flex-1">
-                            <p className="text-sm font-semibold text-slate-800">{isVale ? "Vale" : "Saldo"}</p>
+                            <p className="text-sm font-semibold text-slate-800">{isNote ? "Acerto sem pagamento" : isVale ? "Vale" : "Saldo"}</p>
                             <p className="flex items-center gap-1 text-[11px] text-slate-500">
                               <CalendarDays size={11} />
                               {formatDate(movement.movement_date)}
                               {movement.notes ? ` · ${movement.notes}` : ""}
                             </p>
                           </div>
+                          {isNote ? (
+                            <p className="text-sm font-bold text-slate-400">—</p>
+                          ) : (
                           <p className={`text-sm font-bold ${isVale ? "text-amber-700" : "text-emerald-700"}`}>
                             {isVale ? "-" : "+"} {formatCurrency(Number(movement.amount))}
                           </p>
-                          <button
+                          )}
+                          {!isNote && <button
                             type="button"
                             onClick={() => startEditingMovement(movement)}
                             className="flex h-8 w-8 flex-none items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-brand-600"
@@ -368,7 +374,7 @@ export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissio
                             title="Editar lançamento"
                           >
                             <PencilLine size={14} />
-                          </button>
+                          </button>}
                           <button
                             type="button"
                             onClick={() => { setDeletingMovementId(movement.id); setError(null); setSuccess(null); }}

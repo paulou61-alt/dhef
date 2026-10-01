@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CircleCheckBig, HandCoins, X } from "lucide-react";
-import { addCollaboratorValeMovement, getSettlementPreview, settleCollaborator, type SettlementPreview } from "@/app/(app)/colaboradores/actions";
+import { addCollaboratorValeMovement, getSettlementPreview, registerCollaboratorNoPayment, settleCollaborator, type SettlementPreview } from "@/app/(app)/colaboradores/actions";
 import { formatCurrency, formatDate } from "@/utils/format";
 
 function todayInBrazil() {
@@ -84,7 +84,12 @@ export function SettleCollaboratorButton({ collaborator, valeBalance }: { collab
     // Sem valor: o colaborador não pagou nada e o saldo continua como está.
     if (emptyManual) {
       setError(null);
-      setOpen(false);
+      startTransition(async () => {
+        const response = await registerCollaboratorNoPayment({ collaboratorId: collaborator.id, date: manualDate, notes: manualNotes });
+        if (response.error) return setError(response.error);
+        setOpen(false);
+        router.refresh();
+      });
       return;
     }
     if (!validManual) return setError("Informe um valor válido ou deixe em branco.");
