@@ -162,7 +162,7 @@ export default async function ColaboradoresPage({ searchParams }: { searchParams
                     permissionsEnabled={features.has("permissoes")}
                     actions={
                       <>
-                        {features.has("vales") && <SettleCollaboratorButton collaborator={{ id: collaborator.id, name: collaborator.name }} />}
+                        {features.has("vales") && <SettleCollaboratorButton collaborator={{ id: collaborator.id, name: collaborator.name }} valeBalance={valeBalances.get(collaborator.id) ?? 0} />}
                         <EditCollaboratorButton collaborator={editable} />
                         <CollaboratorAccessButton
                           collaboratorId={collaborator.id}
