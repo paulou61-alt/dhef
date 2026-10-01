@@ -78,8 +78,16 @@ export function SettleCollaboratorButton({ collaborator, valeBalance }: { collab
     setManualNotes("");
   }
 
+  const emptyManual = manualAmount.trim() === "";
+
   function confirmManual() {
-    if (!validManual) return setError("Informe um valor maior que zero.");
+    // Sem valor: o colaborador não pagou nada e o saldo continua como está.
+    if (emptyManual) {
+      setError(null);
+      setOpen(false);
+      return;
+    }
+    if (!validManual) return setError("Informe um valor válido ou deixe em branco.");
     setError(null);
     startTransition(async () => {
       const label = direction === "recebi" ? "Quitação manual · recebido do colaborador" : "Quitação manual · pago ao colaborador";
@@ -193,8 +201,8 @@ export function SettleCollaboratorButton({ collaborator, valeBalance }: { collab
 
               <div className="grid grid-cols-2 gap-2">
                 <button type="button" onClick={() => { setManual(false); setError(null); }} className="btn-secondary">Voltar</button>
-                <button type="button" onClick={confirmManual} disabled={pending || !validManual} className="btn-primary disabled:opacity-50">
-                  {pending ? "Salvando..." : "Confirmar"}
+                <button type="button" onClick={confirmManual} disabled={pending || (!emptyManual && !validManual)} className="btn-primary disabled:opacity-50">
+                  {pending ? "Salvando..." : emptyManual ? "Confirmar sem pagamento" : "Confirmar"}
                 </button>
               </div>
             </div>
