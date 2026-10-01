@@ -14,6 +14,8 @@ export interface OfflineSubmitResult {
   synced: boolean;
   resultId?: string | null;
   error?: string;
+  /** Operação salva, mas com um detalhe que precisa ser avisado. */
+  warning?: string;
   needsAttention?: boolean;
 }
 
@@ -22,6 +24,7 @@ type SyncApiResult = {
   success: boolean;
   resultId?: string | null;
   error?: string;
+  warning?: string;
 };
 
 async function postOperations(operations: OfflineOperation[]): Promise<SyncApiResult[]> {
@@ -54,7 +57,7 @@ async function markNetworkRetry(operation: OfflineOperation, message: string): P
 async function applySyncResult(operation: OfflineOperation, result: SyncApiResult): Promise<OfflineSubmitResult> {
   if (result.success) {
     await removeOfflineOperation(operation.id);
-    return { queued: false, synced: true, resultId: result.resultId ?? null };
+    return { queued: false, synced: true, resultId: result.resultId ?? null, warning: result.warning };
   }
 
   await updateOfflineOperation({
