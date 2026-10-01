@@ -72,7 +72,8 @@ export function SettleCollaboratorButton({ collaborator, valeBalance }: { collab
     setManual(true);
     setError(null);
     setDirection(currentBalance > 0 ? "paguei" : "recebi");
-    setManualAmount(currentBalance !== 0 ? Math.abs(currentBalance).toFixed(2).replace(".", ",") : "");
+    // Começa vazio: o "Saldo depois" mostra o saldo atual e vai abatendo conforme o valor é digitado.
+    setManualAmount("");
     setManualDate(todayInBrazil());
     setManualNotes("");
   }
@@ -183,7 +184,9 @@ export function SettleCollaboratorButton({ collaborator, valeBalance }: { collab
               <div className={`rounded-2xl px-4 py-3 ${balanceAfter < 0 ? "bg-red-50" : balanceAfter > 0 ? "bg-emerald-50" : "bg-slate-50"}`}>
                 <p className="text-xs font-semibold text-slate-500">Saldo depois</p>
                 <p className={`text-xl font-bold ${balanceAfter < 0 ? "text-red-800" : balanceAfter > 0 ? "text-emerald-800" : "text-slate-900"}`}>{formatCurrency(balanceAfter)}</p>
-                {balanceAfter === 0 && <p className="text-[11px] text-slate-500">Quitado.</p>}
+                <p className="text-[11px] text-slate-500">
+                  {balanceAfter === 0 ? "Quitado." : balanceAfter < 0 ? "Ele ainda fica devendo a você." : "Você ainda fica devendo a ele."}
+                </p>
               </div>
 
               {error && <p className="rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
