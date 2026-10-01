@@ -158,11 +158,14 @@ export function CustomerForm({
               searchPlaceholder="Buscar colaborador..."
               options={[
                 { value: "", label: "Sem colaborador" },
-                ...collaborators.map((collaborator) => ({
-                  value: collaborator.id,
-                  label: collaborator.name,
-                  description: collaborator.role === "vendedor" ? "Vendedor" : "Cobrador",
-                })),
+                // Só cobradores. Na edição, mantém o responsável atual mesmo que não seja cobrador.
+                ...collaborators
+                  .filter((collaborator) => collaborator.role === "cobrador" || collaborator.id === customer?.assigned_collaborator_id)
+                  .map((collaborator) => ({
+                    value: collaborator.id,
+                    label: collaborator.name,
+                    description: collaborator.role === "vendedor" ? "Vendedor" : "Cobrador",
+                  })),
               ]}
             />
             <p className="mt-1 text-[11px] text-slate-400">Cada colaborador possui sua própria sequência de fichas #1 a #1000.</p>
