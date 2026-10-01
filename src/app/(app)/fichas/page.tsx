@@ -85,8 +85,15 @@ export default async function FichasPage({ searchParams }: { searchParams: Searc
     installmentBySale.set(i.sale_id, (installmentBySale.get(i.sale_id) ?? 0) + Number(i.amount) - Number(i.paid_amount));
   });
 
+  // Ficha liberada: cliente já comprou e não deve mais nada. O número pode estar com outro cliente,
+  // então ela não entra na contagem de fichas ativas.
+  const openBalance = (customerId: string) =>
+    (salesByCustomer.get(customerId)?.saleIds ?? []).reduce((sum, id) => sum + (installmentBySale.get(id) ?? 0), 0);
+  const isReleased = (customerId: string) => (salesByCustomer.get(customerId)?.saleIds.length ?? 0) > 0 && openBalance(customerId) <= 0;
+
   const grouped = new Map<string, typeof customers>();
-  (customers ?? []).forEach((customer) => {
+  // Fichas ativas primeiro; as quitadas vão para o fim de cada grupo.
+  [...(customers ?? [])].sort((a, b) => Number(isReleased(a.id)) - Number(isReleased(b.id))).forEach((customer) => {
     const key = customer.assigned_collaborator_id ?? "sem";
     grouped.set(key, [...(grouped.get(key) ?? []), customer]);
   });
@@ -127,6 +134,8 @@ export default async function FichasPage({ searchParams }: { searchParams: Searc
         <div className="space-y-4">
           {groupKeys.map((key) => {
             const groupCustomers = grouped.get(key) ?? [];
+            const releasedCount = groupCustomers.filter((customer) => isReleased(customer.id)).length;
+            const activeCount = groupCustomers.length - releasedCount;
             const collaborator = key === "sem" ? null : collaboratorMap.get(key);
             return (
               <section key={key} className="card !p-0 overflow-hidden">
@@ -134,7 +143,10 @@ export default async function FichasPage({ searchParams }: { searchParams: Searc
                   <Users size={16} className="text-brand-600" />
                   <div className="flex-1">
                     <p className="text-sm font-bold text-slate-800">{collaborator?.name ?? "Sem colaborador"}</p>
-                    <p className="text-[11px] text-slate-500">{groupCustomers.length} ficha(s)</p>
+                    <p className="text-[11px] text-slate-500">
+                      {activeCount} ficha(s) ativa(s)
+                      {releasedCount > 0 && ` · ${releasedCount} quitada(s)`}
+                    </p>
                   </div>
                   {collaborator && <span className="text-[11px] font-semibold text-slate-400">{collaborator.role === "vendedor" ? "Vendedor" : "Cobrador"}</span>}
                 </div>
@@ -142,10 +154,11 @@ export default async function FichasPage({ searchParams }: { searchParams: Searc
                 <div className="divide-y divide-slate-100">
                   {groupCustomers.map((customer) => {
                     const stats = salesByCustomer.get(customer.id) ?? { count: 0, total: 0, saleIds: [] };
-                    const open = stats.saleIds.reduce((sum, id) => sum + (installmentBySale.get(id) ?? 0), 0);
+                    const open = openBalance(customer.id);
+                    const released = isReleased(customer.id);
                     return (
                       <Link key={customer.id} href={`/fichas/${customer.id}`} className="flex items-center gap-3 px-4 py-3.5">
-                        <span className="flex h-11 min-w-11 items-center justify-center rounded-xl bg-brand-50 px-2 text-xs font-bold text-brand-700">#{customer.ficha_number}</span>
+                        <span className={`flex h-11 min-w-11 items-center justify-center rounded-xl px-2 text-xs font-bold ${released ? "bg-slate-100 text-slate-400" : "bg-brand-50 text-brand-700"}`}>#{customer.ficha_number}</span>
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-semibold text-slate-800">{customer.name}</p>
                           <p className="text-xs text-slate-500">{stats.count} compra(s) · {formatCurrency(stats.total)} comprado</p>
