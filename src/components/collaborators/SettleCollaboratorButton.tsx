@@ -78,7 +78,8 @@ export function SettleCollaboratorButton({ collaborator, valeBalance }: { collab
     setManualNotes("");
   }
 
-  const emptyManual = manualAmount.trim() === "";
+  // Vazio ou zero: acerto sem pagamento.
+  const emptyManual = manualAmount.trim() === "" || (Number.isFinite(parsedManual) && parsedManual === 0);
 
   function confirmManual() {
     // Sem valor: o colaborador não pagou nada e o saldo continua como está.
