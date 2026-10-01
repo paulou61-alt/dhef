@@ -3,7 +3,7 @@ import "server-only";
 import { jsPDF } from "jspdf";
 import autoTable, { type RowInput } from "jspdf-autotable";
 import type { MonthlyBusinessReport } from "@/lib/reports/monthly-report";
-import { formatCurrency, formatDate } from "@/utils/format";
+import { formatCurrency } from "@/utils/format";
 
 type RGB = [number, number, number];
 
@@ -278,79 +278,52 @@ export function createMonthlyReportPdf(report: MonthlyBusinessReport): ArrayBuff
     }
   );
 
-  // ---------- Clientes ----------
-  sectionTitle("Clientes que mais compraram");
+  // ---------- Clientes (só os 5 principais) ----------
+  sectionTitle("Clientes que mais compraram", "Os 5 maiores compradores do mês");
   table(
     ["#", "Cliente", "Total comprado"],
-    report.topCustomers.map((customer, index) => [String(index + 1), customer.name, money(customer.total)]),
+    report.topCustomers.slice(0, 5).map((customer, index) => [String(index + 1), customer.name, money(customer.total)]),
     { align: { 0: "center", 2: "right" }, widths: { 0: 12 }, empty: "Nenhuma compra de cliente neste mês." }
   );
 
-  // ---------- Vendas ----------
-  sectionTitle("Vendas do mês", `${report.salesRows.length} venda(s) · ${money(s.revenue)}`);
+  // ---------- Recebimentos por forma de pagamento ----------
+  const byMethod = new Map<string, { count: number; total: number }>();
+  report.paymentRows.forEach((payment) => {
+    const current = byMethod.get(payment.method) ?? { count: 0, total: 0 };
+    current.count += 1;
+    current.total += payment.amount;
+    byMethod.set(payment.method, current);
+  });
+  const methodRows = [...byMethod.entries()].sort((a, b) => b[1].total - a[1].total);
+  const methodTotal = methodRows.reduce((sum, [, data]) => sum + data.total, 0);
+  sectionTitle("Recebimentos do mês", "Parcelas recebidas por forma de pagamento");
   table(
-    ["Data", "Venda", "Cliente", "Vendedor", "Pagamento", "Total"],
-    report.salesRows.map((sale) => [formatDate(sale.date), `#${sale.saleNumber}`, sale.customer, sale.seller, PAYMENT_LABELS[sale.paymentMethod] ?? sale.paymentMethod, money(sale.total)]),
-    {
-      align: { 0: "center", 1: "center", 5: "right" },
-      widths: { 0: 20, 1: 16 },
-      foot: report.salesRows.length ? ["", "", "", "", "Total", money(s.revenue)] : undefined,
-    }
-  );
-
-  // ---------- Recebimentos ----------
-  sectionTitle("Recebimentos do mês", `${report.paymentRows.length} recebimento(s) · ${money(s.paymentsReceived)}`);
-  table(
-    ["Data", "Cliente", "Referência", "Forma", "Recebido por", "Valor"],
-    report.paymentRows.map((payment) => [
-      formatDate(payment.date),
-      payment.customer,
-      `${payment.reference}${payment.saleNumber ? ` #${payment.saleNumber}` : ""}`,
-      PAYMENT_LABELS[payment.method] ?? payment.method,
-      payment.collector,
-      money(payment.amount),
+    ["Forma", "Recebimentos", "Valor", "% do total"],
+    methodRows.map(([method, data]) => [
+      PAYMENT_LABELS[method] ?? method,
+      String(data.count),
+      money(data.total),
+      methodTotal > 0 ? `${Math.round((data.total / methodTotal) * 100)}%` : "-",
     ]),
     {
-      align: { 0: "center", 5: "right" },
-      widths: { 0: 20 },
-      foot: report.paymentRows.length ? ["", "", "", "", "Total", money(s.paymentsReceived)] : undefined,
+      align: { 1: "center", 2: "right", 3: "right" },
+      foot: methodRows.length ? ["Total", String(report.paymentRows.length), money(methodTotal), "100%"] : undefined,
+      empty: "Nenhum recebimento neste mês.",
     }
   );
 
-  // ---------- Carteira a receber ----------
-  const receivables = report.openReceivablesRows
-    .slice()
-    .sort((a, b) => Number(b.overdue) - Number(a.overdue) || a.dueDate.localeCompare(b.dueDate));
-  sectionTitle("Carteira a receber (hoje)", `${money(s.openReceivables)} em aberto · ${money(s.overdueReceivables)} vencido`);
+  // ---------- Despesas por categoria ----------
+  const byCategory = new Map<string, number>();
+  report.expenseRows.forEach((expense) => byCategory.set(expense.category, (byCategory.get(expense.category) ?? 0) + expense.amount));
+  const categoryRows = [...byCategory.entries()].sort((a, b) => b[1] - a[1]);
+  sectionTitle("Despesas do mês", "Agrupadas por categoria");
   table(
-    ["Situação", "Cliente", "Ficha", "Parcela", "Vencimento", "Em aberto"],
-    receivables.map((row) => [
-      row.overdue ? "Vencido" : "Em dia",
-      row.customer,
-      row.fichaNumber ? `#${row.fichaNumber}` : "-",
-      row.saleNumber ? `${row.installmentNumber}/${row.totalInstallments} · #${row.saleNumber}` : row.reference,
-      formatDate(row.dueDate),
-      money(row.openAmount),
-    ]),
+    ["Categoria", "Valor", "% do total"],
+    categoryRows.map(([category, total]) => [category, money(total), s.expenses > 0 ? `${Math.round((total / s.expenses) * 100)}%` : "-"]),
     {
-      align: { 0: "center", 2: "center", 3: "center", 4: "center", 5: "right" },
-      widths: { 0: 20, 2: 15 },
-      tone: (row, column) => (column === 0 ? (receivables[row].overdue ? DANGER : SUCCESS) : null),
-      foot: receivables.length ? ["", "", "", "", "Total", money(s.openReceivables)] : undefined,
-      empty: "Nenhum valor em aberto.",
-    }
-  );
-
-  // ---------- Despesas ----------
-  sectionTitle("Despesas do mês", money(s.expenses));
-  table(
-    ["Data", "Categoria", "Descrição", "Valor"],
-    report.expenseRows.map((expense) => [formatDate(expense.date), expense.category, expense.description, money(expense.amount)]),
-    {
-      align: { 0: "center", 3: "right" },
-      widths: { 0: 20 },
-      tone: (_row, column) => (column === 3 ? DANGER : null),
-      foot: report.expenseRows.length ? ["", "", "Total", money(s.expenses)] : undefined,
+      align: { 1: "right", 2: "right" },
+      tone: (_row, column) => (column === 1 ? DANGER : null),
+      foot: categoryRows.length ? ["Total", money(s.expenses), "100%"] : undefined,
       empty: "Nenhuma despesa neste mês.",
     }
   );
