@@ -71,7 +71,7 @@ export default async function ConfiguracoesPage() {
         </section>
       )}
 
-      <ProfileForm profile={profile} email={user?.email ?? ""} />
+      <ProfileForm profile={profile} email={user?.email ?? ""} isOwner={access?.role === "owner"} />
     </div>
   );
 }
