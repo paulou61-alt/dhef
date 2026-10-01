@@ -8,6 +8,7 @@ import { CollaboratorForm } from "@/components/collaborators/CollaboratorForm";
 import { CollaboratorProfileCard } from "@/components/collaborators/CollaboratorProfileCard";
 import { CollaboratorAccessButton } from "@/components/collaborators/CollaboratorAccessButton";
 import { CollaboratorSearchList } from "@/components/collaborators/CollaboratorSearchList";
+import { CollectionsByCollector, type CollectionsFilter } from "@/components/collaborators/CollectionsByCollector";
 import { EditCollaboratorButton } from "@/components/collaborators/EditCollaboratorButton";
 import { normalizeViewPermissions } from "@/lib/permissions";
 
@@ -23,14 +24,14 @@ type ValeMovement = {
   created_at: string;
 };
 
-export default async function ColaboradoresPage() {
+export default async function ColaboradoresPage({ searchParams }: { searchParams: CollectionsFilter }) {
   const access = await getAccessContext();
   if (!access) redirect("/login");
   if (access.role !== "owner") redirect("/login");
 
   const supabase = createClient();
   const features = planFeatures(await getSubscription(access));
-  const [collaboratorsResult, customersResult, salesResult, paymentsResult, valesResult] = await Promise.all([
+  const [collaboratorsResult, customersResult, salesResult, paymentsResult, valesResult, allCollaboratorsResult] = await Promise.all([
     supabase
       .from("collaborators")
       .select("id, name, phone, role, is_active, auth_user_id, accepted_at, view_permissions, username")
@@ -61,6 +62,8 @@ export default async function ColaboradoresPage() {
         .order("id")
         .range(from, to)
     ),
+    // Inclui os desativados para manter o nome nas cobranças antigas.
+    supabase.from("collaborators").select("id, name, role, is_active").eq("owner_id", access.ownerId).order("name"),
   ]);
 
   const collaborators = collaboratorsResult.data ?? [];
@@ -115,6 +118,8 @@ export default async function ColaboradoresPage() {
         <h1 className="text-xl font-bold text-slate-900">Colaboradores</h1>
         <p className="mt-1 text-sm text-slate-500">Gerencie a equipe, as visualizações, vendas e vales de cada colaborador.</p>
       </div>
+
+      <CollectionsByCollector ownerId={access.ownerId} collaborators={allCollaboratorsResult.data ?? []} filter={searchParams} />
 
       <CollaboratorForm canCustomizePermissions={features.has("permissoes")} />
 

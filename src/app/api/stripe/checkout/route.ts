@@ -23,7 +23,12 @@ async function handle(request: Request) {
 
   const purchase = await preparePurchase(access, await request.json().catch(() => ({})));
   if (purchase instanceof NextResponse) return purchase;
-  const { stripe, price, customerId, trialEnd } = purchase;
+  const { stripe, price, customerId, trialEnd, paidUntilMs } = purchase;
+
+  // O Stripe só aceita uma data de fim de teste a pelo menos 48 h. Quando faltar menos que isso,
+  // usa dias inteiros de teste (arredondando para cima) para não cobrar antes do fim do período grátis.
+  const remainingMs = paidUntilMs - Date.now();
+  const trialDays = !trialEnd && remainingMs > 0 ? Math.ceil(remainingMs / (24 * 60 * 60 * 1000)) : null;
 
   const baseUrl = appUrl(request);
   const session = await stripe.checkout.sessions.create({
@@ -33,7 +38,7 @@ async function handle(request: Request) {
     line_items: [{ price: price.id, quantity: 1 }],
     subscription_data: {
       metadata: { owner_id: access.ownerId },
-      ...(trialEnd ? { trial_end: trialEnd } : {}),
+      ...(trialEnd ? { trial_end: trialEnd } : trialDays ? { trial_period_days: trialDays } : {}),
     },
     allow_promotion_codes: true,
     locale: "pt-BR",
