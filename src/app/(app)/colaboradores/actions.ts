@@ -448,3 +448,78 @@ export async function setCollaboratorValeBalance(input: {
   revalidatePath("/meu-vale");
   return { success: true };
 }
+
+export interface SettlementPreview {
+  role: "vendedor" | "cobrador";
+  periodStart: string | null;
+  periodEnd: string;
+  baseAmount: number;
+  valeBalance: number;
+  lastPercent: number;
+}
+
+const SETTLEMENT_SQL_MISSING = "Falta atualizar o banco: rode o SQL de acerto com colaboradores no Supabase.";
+
+function isMissingFunction(message: string) {
+  return /function|does not exist|schema cache/i.test(message);
+}
+
+export async function getSettlementPreview(input: {
+  collaboratorId: string;
+  periodEnd: string;
+}): Promise<{ error?: string; preview?: SettlementPreview }> {
+  const access = await getAccessContext();
+  if (!access || access.role !== "owner") return { error: "Apenas o proprietário pode fazer acertos." };
+  if (!(await companyHasFeature("vales"))) return { error: "O acerto com colaboradores está disponível a partir do plano Profissional." };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.periodEnd)) return { error: "Informe uma data válida." };
+
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .rpc("collaborator_settlement_preview", { p_collaborator_id: input.collaboratorId, p_period_end: input.periodEnd })
+    .maybeSingle<{ role: string; period_start: string | null; period_end: string; base_amount: number; vale_balance: number; last_percent: number }>();
+
+  if (error) return { error: isMissingFunction(error.message) ? SETTLEMENT_SQL_MISSING : "Não foi possível calcular o acerto." };
+  if (!data) return { error: "Colaborador não encontrado." };
+
+  return {
+    preview: {
+      role: data.role === "cobrador" ? "cobrador" : "vendedor",
+      periodStart: data.period_start,
+      periodEnd: data.period_end,
+      baseAmount: Number(data.base_amount ?? 0),
+      valeBalance: Number(data.vale_balance ?? 0),
+      lastPercent: Number(data.last_percent ?? 0),
+    },
+  };
+}
+
+export async function settleCollaborator(input: {
+  collaboratorId: string;
+  commissionPercent: number;
+  periodEnd: string;
+}): Promise<{ error?: string; result?: number }> {
+  const access = await getAccessContext();
+  if (!access || access.role !== "owner") return { error: "Apenas o proprietário pode fazer acertos." };
+  if (!(await companyHasFeature("vales"))) return { error: "O acerto com colaboradores está disponível a partir do plano Profissional." };
+
+  const percent = Number(input.commissionPercent);
+  if (!Number.isFinite(percent) || percent < 0 || percent > 100) return { error: "Informe uma comissão entre 0% e 100%." };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.periodEnd)) return { error: "Informe uma data válida." };
+
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("settle_collaborator", {
+    p_collaborator_id: input.collaboratorId,
+    p_commission_percent: Number(percent.toFixed(2)),
+    p_period_end: input.periodEnd,
+  });
+
+  if (error) {
+    if (error.message.includes("já foi acertado")) return { error: "Este período já foi acertado. Escolha uma data mais recente." };
+    if (error.message.includes("Data final")) return { error: "A data do acerto não pode ser no futuro." };
+    return { error: isMissingFunction(error.message) ? SETTLEMENT_SQL_MISSING : "Não foi possível quitar." };
+  }
+
+  revalidatePath("/colaboradores");
+  revalidatePath("/meu-vale");
+  return { result: Number(data ?? 0) };
+}
