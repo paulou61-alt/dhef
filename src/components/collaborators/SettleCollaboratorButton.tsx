@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CircleCheckBig, X } from "lucide-react";
-import { getSettlementPreview, settleCollaborator, type SettlementPreview } from "@/app/(app)/colaboradores/actions";
+import { CircleCheckBig, HandCoins, X } from "lucide-react";
+import { addCollaboratorValeMovement, getSettlementPreview, settleCollaborator, type SettlementPreview } from "@/app/(app)/colaboradores/actions";
 import { formatCurrency, formatDate } from "@/utils/format";
 
 function todayInBrazil() {
@@ -11,7 +11,7 @@ function todayInBrazil() {
 }
 
 // Acerto com o colaborador: comissão do período menos os vales. Ao quitar, o saldo de vale volta a zero.
-export function SettleCollaboratorButton({ collaborator }: { collaborator: { id: string; name: string } }) {
+export function SettleCollaboratorButton({ collaborator, valeBalance }: { collaborator: { id: string; name: string }; valeBalance: number }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [periodEnd, setPeriodEnd] = useState(todayInBrazil);
@@ -20,6 +20,12 @@ export function SettleCollaboratorButton({ collaborator }: { collaborator: { id:
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  // Quitação manual: você digita quanto foi pago, sem calcular comissão.
+  const [manual, setManual] = useState(false);
+  const [direction, setDirection] = useState<"recebi" | "paguei">("recebi");
+  const [manualAmount, setManualAmount] = useState("");
+  const [manualDate, setManualDate] = useState(todayInBrazil);
+  const [manualNotes, setManualNotes] = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -46,11 +52,47 @@ export function SettleCollaboratorButton({ collaborator }: { collaborator: { id:
   const result = preview ? Math.round((preview.valeBalance + commission) * 100) / 100 : 0;
   const alreadySettled = Boolean(preview?.periodStart && preview.periodStart > periodEnd);
 
+  const currentBalance = preview?.valeBalance ?? valeBalance;
+  // Aceita "1.234,56", "1234,56" e "1234.56".
+  const parsedManual = Number(manualAmount.includes(",") ? manualAmount.replace(/\./g, "").replace(",", ".") : manualAmount);
+  const validManual = Number.isFinite(parsedManual) && parsedManual > 0;
+  // Ele pagando reduz o que deve (saldo sobe); você pagando reduz o que deve a ele (saldo desce).
+  const balanceAfter = Math.round((currentBalance + (validManual ? (direction === "recebi" ? parsedManual : -parsedManual) : 0)) * 100) / 100;
+
   function openModal() {
     setPeriodEnd(todayInBrazil());
     setPercent("");
     setPreview(null);
+    setManual(false);
+    setError(null);
     setOpen(true);
+  }
+
+  function startManual() {
+    setManual(true);
+    setError(null);
+    setDirection(currentBalance > 0 ? "paguei" : "recebi");
+    setManualAmount(currentBalance !== 0 ? Math.abs(currentBalance).toFixed(2).replace(".", ",") : "");
+    setManualDate(todayInBrazil());
+    setManualNotes("");
+  }
+
+  function confirmManual() {
+    if (!validManual) return setError("Informe um valor maior que zero.");
+    setError(null);
+    startTransition(async () => {
+      const label = direction === "recebi" ? "Quitação manual · recebido do colaborador" : "Quitação manual · pago ao colaborador";
+      const response = await addCollaboratorValeMovement({
+        collaboratorId: collaborator.id,
+        movementType: direction === "recebi" ? "abatimento" : "vale",
+        amount: parsedManual,
+        movementDate: manualDate,
+        notes: manualNotes.trim() ? `${label} · ${manualNotes.trim()}` : label,
+      });
+      if (response.error) return setError(response.error);
+      setOpen(false);
+      router.refresh();
+    });
   }
 
   function close() {
@@ -92,7 +134,9 @@ export function SettleCollaboratorButton({ collaborator }: { collaborator: { id:
               <div className="min-w-0 flex-1">
                 <h2 className="text-base font-bold text-slate-900">Acerto de {collaborator.name}</h2>
                 <p className="mt-0.5 text-xs text-slate-500">
-                  {preview?.periodStart ? `Desde ${formatDate(preview.periodStart)} (depois do último acerto)` : "Desde o início (primeiro acerto)"}
+                  {manual
+                    ? "Informe quanto foi pago, sem calcular comissão."
+                    : preview?.periodStart ? `Desde ${formatDate(preview.periodStart)} (depois do último acerto)` : "Desde o início (primeiro acerto)"}
                 </p>
               </div>
               <button type="button" onClick={close} className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100" aria-label="Fechar">
@@ -100,6 +144,58 @@ export function SettleCollaboratorButton({ collaborator }: { collaborator: { id:
               </button>
             </div>
 
+            {manual ? (
+            <div className="space-y-4 p-5">
+              <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
+                <p className="text-xs text-slate-500">Saldo de vale atual</p>
+                <p className={`text-lg font-bold ${currentBalance < 0 ? "text-danger" : currentBalance > 0 ? "text-success" : "text-slate-900"}`}>{formatCurrency(currentBalance)}</p>
+                <p className="text-[11px] text-slate-500">{currentBalance < 0 ? "Ele está devendo a você." : currentBalance > 0 ? "Você está devendo a ele." : "Nada pendente."}</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                {([["recebi", "Ele me pagou"], ["paguei", "Eu paguei a ele"]] as const).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setDirection(value)}
+                    className={`rounded-xl border px-3 py-2.5 text-sm font-semibold transition ${direction === value ? "border-brand-500 bg-brand-50 text-brand-700" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label" htmlFor={`manual-amount-${collaborator.id}`}>Valor</label>
+                  <input id={`manual-amount-${collaborator.id}`} inputMode="decimal" value={manualAmount} onChange={(e) => setManualAmount(e.target.value)} className="input-field" placeholder="0,00" />
+                </div>
+                <div>
+                  <label className="label" htmlFor={`manual-date-${collaborator.id}`}>Data</label>
+                  <input id={`manual-date-${collaborator.id}`} type="date" value={manualDate} onChange={(e) => setManualDate(e.target.value)} className="input-field" />
+                </div>
+              </div>
+              <div>
+                <label className="label" htmlFor={`manual-notes-${collaborator.id}`}>Observação</label>
+                <input id={`manual-notes-${collaborator.id}`} value={manualNotes} onChange={(e) => setManualNotes(e.target.value)} maxLength={120} className="input-field" placeholder="Opcional" />
+              </div>
+
+              <div className={`rounded-2xl px-4 py-3 ${balanceAfter < 0 ? "bg-red-50" : balanceAfter > 0 ? "bg-emerald-50" : "bg-slate-50"}`}>
+                <p className="text-xs font-semibold text-slate-500">Saldo depois</p>
+                <p className={`text-xl font-bold ${balanceAfter < 0 ? "text-red-800" : balanceAfter > 0 ? "text-emerald-800" : "text-slate-900"}`}>{formatCurrency(balanceAfter)}</p>
+                {balanceAfter === 0 && <p className="text-[11px] text-slate-500">Quitado.</p>}
+              </div>
+
+              {error && <p className="rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
+
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => { setManual(false); setError(null); }} className="btn-secondary">Voltar</button>
+                <button type="button" onClick={confirmManual} disabled={pending || !validManual} className="btn-primary disabled:opacity-50">
+                  {pending ? "Salvando..." : "Confirmar"}
+                </button>
+              </div>
+            </div>
+            ) : (
             <div className="space-y-4 p-5">
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -148,7 +244,17 @@ export function SettleCollaboratorButton({ collaborator }: { collaborator: { id:
                   {pending ? "Quitando..." : "Confirmar quitação"}
                 </button>
               </div>
+
+              <button
+                type="button"
+                onClick={startManual}
+                className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 px-3 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+              >
+                <HandCoins size={15} />
+                Quitar manualmente
+              </button>
             </div>
+            )}
           </div>
         </div>
       )}
