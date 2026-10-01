@@ -21,6 +21,10 @@ const withPWA = require("next-pwa")({
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  experimental: {
+    // O PDF do relatório usa a versão Node do jsPDF (sem dependências de navegador).
+    serverComponentsExternalPackages: ["jspdf", "jspdf-autotable"],
+  },
   async headers() {
     return [
       {
