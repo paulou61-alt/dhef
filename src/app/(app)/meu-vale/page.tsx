@@ -106,12 +106,12 @@ export default async function MeuValePage() {
               // Valor zero: acerto registrado sem pagamento.
               const isNote = Number(movement.amount) === 0;
               return (
-                <div key={movement.id} className="flex items-center gap-3 px-4 py-3.5">
-                  <span className={`flex h-10 w-10 flex-none items-center justify-center rounded-xl ${isNote ? "bg-slate-100 text-slate-500" : isVale ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>
+                <div key={movement.id} className={`flex items-center gap-3 px-4 py-3.5 ${isNote ? "border-l-4 border-red-400 bg-red-50" : ""}`}>
+                  <span className={`flex h-10 w-10 flex-none items-center justify-center rounded-xl ${isNote ? "bg-red-100 text-red-600" : isVale ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>
                     {isNote ? <CalendarDays size={17} /> : isVale ? <Minus size={17} /> : <Plus size={17} />}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-slate-800">{isNote ? "Acerto sem pagamento" : isVale ? "Vale" : "Saldo"}</p>
+                    <p className={`text-sm font-semibold ${isNote ? "text-red-700" : "text-slate-800"}`}>{isNote ? "Acerto sem pagamento" : isVale ? "Vale" : "Saldo"}</p>
                     <p className="mt-0.5 flex flex-wrap items-center gap-1 text-[11px] text-slate-500">
                       <CalendarDays size={11} />
                       {formatDate(movement.movement_date)}
@@ -119,7 +119,7 @@ export default async function MeuValePage() {
                     </p>
                   </div>
                   {isNote ? (
-                    <p className="text-sm font-bold text-slate-400">—</p>
+                    <p className="text-sm font-bold text-red-400">—</p>
                   ) : (
                     <p className={`text-sm font-bold ${isVale ? "text-amber-700" : "text-emerald-700"}`}>
                       {isVale ? "-" : "+"} {formatCurrency(Number(movement.amount))}
