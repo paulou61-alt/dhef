@@ -42,8 +42,8 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: {
         <div className="flex items-start gap-3">
           <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white text-brand-600 shadow-sm"><FileText size={19} /></span>
           <div>
-            <p className="text-sm font-bold text-slate-900">PDF completo do fechamento</p>
-            <p className="mt-1 text-xs leading-5 text-slate-600">O arquivo inclui resumo financeiro, vendas, recebimentos, dívidas atuais, despesas, produtos vendidos, estoque, clientes e desempenho dos colaboradores.</p>
+            <p className="text-sm font-bold text-slate-900">PDF resumido do fechamento</p>
+            <p className="mt-1 text-xs leading-5 text-slate-600">O arquivo traz apenas os principais dados da empresa: faturamento, lucro, despesas, vendas, ticket médio e saldos a receber.</p>
           </div>
         </div>
       </div>

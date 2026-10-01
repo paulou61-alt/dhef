@@ -22,7 +22,7 @@ export async function GET(request: Request) {
     status: 200,
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="relatorio-negocio-${report.monthKey}.pdf"`,
+      "Content-Disposition": `attachment; filename="resumo-negocio-${report.monthKey}.pdf"`,
       "Cache-Control": "no-store",
     },
   });
