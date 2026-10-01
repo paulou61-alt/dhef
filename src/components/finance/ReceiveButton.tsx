@@ -47,6 +47,7 @@ export function ReceiveButton({
   const [method, setMethod] = useState<"pix" | "dinheiro" | "cartao">("pix");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState("");
+  const [nextDueDate, setNextDueDate] = useState("");
   const [purchaseItems, setPurchaseItems] = useState<PurchaseItem[]>([]);
   const [purchasePaymentMethod, setPurchasePaymentMethod] = useState("parcelado");
   const [purchaseDownPayment, setPurchaseDownPayment] = useState("");
@@ -59,6 +60,8 @@ export function ReceiveButton({
 
   const parsedAmount = Number(amount.replace(",", "."));
   const excessAmount = Number.isFinite(parsedAmount) ? Math.round((parsedAmount - openAmount) * 100) / 100 : 0;
+  // Pagou diferente do saldo da parcela: dá para escolher o vencimento do que ficou em aberto.
+  const canReschedule = Number.isFinite(parsedAmount) && parsedAmount > 0 && excessAmount !== 0 && !(excessAmount > 0 && purchaseItems.length > 0);
 
   const purchaseNeedsTerms = purchasePaymentMethod === "fiado" || purchasePaymentMethod === "parcelado";
 
@@ -84,6 +87,7 @@ export function ReceiveButton({
           paymentDate: date,
           notes,
         };
+        if (canReschedule && nextDueDate) payload.nextDueDate = nextDueDate;
 
         if (hasPurchase) {
           payload.items = purchaseItems.map((item) => ({
@@ -102,6 +106,7 @@ export function ReceiveButton({
         if (result.synced) {
           setOpen(false);
           resetPurchase();
+          if (result.warning) window.alert(result.warning);
           if (successHref) window.location.href = successHref;
           else window.location.reload();
           return;
@@ -157,6 +162,17 @@ export function ReceiveButton({
                     )
                   )}
                 </div>
+                {canReschedule && (
+                  <div>
+                    <label className="label">{excessAmount < 0 ? "Vencimento do restante" : "Vencimento da próxima parcela"}</label>
+                    <input className="input-field" type="date" value={nextDueDate} onChange={(e) => setNextDueDate(e.target.value)} />
+                    <p className="mt-1 text-[11px] text-slate-400">
+                      {excessAmount < 0
+                        ? `Faltam ${formatCurrency(-excessAmount)} desta parcela. Escolha quando o cliente vai pagar o restante (opcional).`
+                        : "Opcional. Muda o vencimento da próxima parcela que ainda ficar em aberto depois do abatimento."}
+                    </p>
+                  </div>
+                )}
                 <div>
                   <label className="label">Forma do recebimento</label>
                   <SelectField

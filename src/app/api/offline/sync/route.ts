@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   const operations = Array.isArray(body.operations) ? body.operations.slice(0, 50) : [];
   if (!operations.length) return NextResponse.json({ results: [] });
 
-  const results = [] as Array<{ id: string; success: boolean; resultId?: string | null; error?: string }>;
+  const results = [] as Array<{ id: string; success: boolean; resultId?: string | null; error?: string; warning?: string }>;
 
   for (const operation of operations) {
     if (!operation?.id || operation.userId !== user.id) {
@@ -62,7 +62,32 @@ export async function POST(request: Request) {
       continue;
     }
 
-    const payload = (data ?? {}) as { resultId?: string | null };
+    const payload = (data ?? {}) as { resultId?: string | null; alreadyProcessed?: boolean };
+
+    // Vencimento escolhido para o saldo que ficou em aberto depois do recebimento.
+    const nextDueDate = operation.payload?.nextDueDate;
+    if (
+      (operation.type === "payment" || operation.type === "payment_purchase")
+      && !payload.alreadyProcessed
+      && typeof nextDueDate === "string"
+      && /^\d{4}-\d{2}-\d{2}$/.test(nextDueDate)
+    ) {
+      const { error: rescheduleError } = await supabase.rpc("reschedule_open_installment", {
+        p_installment_id: operation.payload.installmentId,
+        p_due_date: nextDueDate,
+      });
+      if (rescheduleError) {
+        // O recebimento já foi gravado; só o novo vencimento não foi aplicado.
+        results.push({
+          id: operation.id,
+          success: true,
+          resultId: payload.resultId ?? null,
+          warning: "Recebimento salvo, mas não foi possível alterar o vencimento. Ajuste a data na ficha do cliente.",
+        });
+        continue;
+      }
+    }
+
     results.push({ id: operation.id, success: true, resultId: payload.resultId ?? null });
   }
 
