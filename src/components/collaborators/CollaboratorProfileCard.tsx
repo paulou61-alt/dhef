@@ -280,7 +280,7 @@ export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissio
                   const isEditingMovement = editingMovementId === movement.id;
 
                   return (
-                    <div key={movement.id} className="px-4 py-3">
+                    <div key={movement.id} className={`px-4 py-3 ${isNote ? "border-l-4 border-red-400 bg-red-50" : ""}`}>
                       {isEditingMovement ? (
                         <div className="space-y-3">
                           <div className="flex items-center gap-2">
@@ -348,19 +348,19 @@ export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissio
                         </div>
                       ) : (
                         <div className="flex items-center gap-3">
-                          <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${isNote ? "bg-slate-100 text-slate-500" : isVale ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>
+                          <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${isNote ? "bg-red-100 text-red-600" : isVale ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>
                             {isNote ? <CalendarDays size={16} /> : isVale ? <Minus size={16} /> : <Plus size={16} />}
                           </span>
                           <div className="min-w-0 flex-1">
-                            <p className="text-sm font-semibold text-slate-800">{isNote ? "Acerto sem pagamento" : isVale ? "Vale" : "Saldo"}</p>
-                            <p className="flex items-center gap-1 text-[11px] text-slate-500">
+                            <p className={`text-sm font-semibold ${isNote ? "text-red-700" : "text-slate-800"}`}>{isNote ? "Acerto sem pagamento" : isVale ? "Vale" : "Saldo"}</p>
+                            <p className={`flex items-center gap-1 text-[11px] ${isNote ? "text-red-600" : "text-slate-500"}`}>
                               <CalendarDays size={11} />
                               {formatDate(movement.movement_date)}
                               {movement.notes ? ` · ${movement.notes}` : ""}
                             </p>
                           </div>
                           {isNote ? (
-                            <p className="text-sm font-bold text-slate-400">—</p>
+                            <p className="text-sm font-bold text-red-400">—</p>
                           ) : (
                           <p className={`text-sm font-bold ${isVale ? "text-amber-700" : "text-emerald-700"}`}>
                             {isVale ? "-" : "+"} {formatCurrency(Number(movement.amount))}
