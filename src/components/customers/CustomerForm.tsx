@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { SelectField } from "@/components/ui/SelectField";
 import { maskPhone, maskCEP, maskCPF, maskCurrencyInput } from "@/utils/masks";
+import { BR_STATES } from "@/utils/br-states";
 import type { Customer } from "@/types/database.types";
 import type { CustomerFormState } from "@/app/(app)/clientes/actions";
 import {
@@ -12,10 +13,6 @@ import {
   type PurchaseVariant,
 } from "@/components/sales/PurchaseProductSelector";
 
-const BR_STATES = [
-  "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG",
-  "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO",
-];
 
 export interface CustomerCollaboratorOption {
   id: string;
@@ -47,6 +44,7 @@ export function CustomerForm({
   products = [],
   variants = [],
   accessRole = "owner",
+  defaults,
 }: {
   customer?: Customer;
   action: (formData: FormData) => Promise<CustomerFormState>;
@@ -54,6 +52,8 @@ export function CustomerForm({
   products?: PurchaseProduct[];
   variants?: PurchaseVariant[];
   accessRole?: "owner" | "vendedor" | "cobrador";
+  /** Cidade e estado do negócio (Configurações), usados como padrão em cliente novo. */
+  defaults?: { city: string | null; state: string | null };
 }) {
   const [phone, setPhone] = useState(customer?.phone ?? "");
   const [whatsapp, setWhatsapp] = useState(customer?.whatsapp ?? "");
@@ -191,7 +191,7 @@ export function CustomerForm({
             <SelectField
               id="state"
               name="state"
-              defaultValue={customer?.state ?? ""}
+              defaultValue={customer ? customer.state ?? "" : defaults?.state ?? ""}
               placeholder="Selecione"
               searchable
               searchPlaceholder="Buscar UF..."
@@ -224,7 +224,7 @@ export function CustomerForm({
           </div>
           <div>
             <label className="label" htmlFor="city">Cidade</label>
-            <input id="city" name="city" className="input-field" defaultValue={customer?.city ?? ""} />
+            <input id="city" name="city" className="input-field" defaultValue={customer ? customer.city ?? "" : defaults?.city ?? ""} />
           </div>
         </div>
       </section>

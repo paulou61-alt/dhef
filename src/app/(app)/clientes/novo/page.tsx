@@ -13,7 +13,7 @@ export default async function NovoClientePage() {
   if (access.role === "cobrador") redirect("/cobrancas");
 
   const supabase = createClient();
-  const [{ data: collaborators }, { data: products }, { data: variants }] = await Promise.all([
+  const [{ data: collaborators }, { data: products }, { data: variants }, { data: businessDefaults }] = await Promise.all([
     supabase
       .from("collaborators")
       .select("id, name, role")
@@ -25,6 +25,8 @@ export default async function NovoClientePage() {
     fetchAll((from, to) =>
       supabase.from("product_variants").select("id, product_id, variant_name, stock_quantity, sale_price").order("variant_name").order("id").range(from, to)
     ),
+    // Cidade e estado do negócio, definidos em Configurações. Sem a função no banco, o campo só fica vazio.
+    supabase.rpc("get_business_defaults").maybeSingle<{ city: string | null; state: string | null }>(),
   ]);
 
   return (
@@ -39,6 +41,7 @@ export default async function NovoClientePage() {
         products={(products ?? []) as any}
         variants={(variants ?? []) as any}
         accessRole={access.role}
+        defaults={businessDefaults ?? undefined}
       />
     </div>
   );
