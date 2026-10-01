@@ -64,6 +64,21 @@ export async function POST(request: Request) {
 
     const payload = (data ?? {}) as { resultId?: string | null; alreadyProcessed?: boolean };
 
+    // Vendedor responsável escolhido pelo proprietário na Nova venda.
+    const sellerId = operation.payload?.sellerId;
+    if (operation.type === "sale" && !payload.alreadyProcessed && payload.resultId && typeof sellerId === "string" && sellerId) {
+      const { error: sellerError } = await supabase.rpc("set_sale_seller", { p_sale_id: payload.resultId, p_collaborator_id: sellerId });
+      if (sellerError) {
+        results.push({
+          id: operation.id,
+          success: true,
+          resultId: payload.resultId,
+          warning: "Venda salva, mas não foi possível registrar o vendedor responsável.",
+        });
+        continue;
+      }
+    }
+
     // Vencimento escolhido para o saldo que ficou em aberto depois do recebimento.
     const nextDueDate = operation.payload?.nextDueDate;
     if (
