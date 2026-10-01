@@ -523,3 +523,37 @@ export async function settleCollaborator(input: {
   revalidatePath("/meu-vale");
   return { result: Number(data ?? 0) };
 }
+
+/** Registra no histórico de vales um acerto em que o colaborador não pagou nada. O saldo não muda. */
+export async function registerCollaboratorNoPayment(input: {
+  collaboratorId: string;
+  date: string;
+  notes?: string;
+}): Promise<{ error?: string; success?: boolean }> {
+  const access = await getAccessContext();
+  if (!access || access.role !== "owner") return { error: "Apenas o proprietário pode fazer acertos." };
+  if (!(await companyHasFeature("vales"))) return { error: "O acerto com colaboradores está disponível a partir do plano Profissional." };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) return { error: "Informe uma data válida." };
+
+  const extra = input.notes?.trim().slice(0, 120);
+  const supabase = createClient();
+  const { error } = await supabase.from("collaborator_vale_movements").insert({
+    owner_id: access.ownerId,
+    collaborator_id: input.collaboratorId,
+    movement_type: "abatimento",
+    amount: 0,
+    movement_date: input.date,
+    notes: extra ? `Acerto feito, não pagou · ${extra}` : "Acerto feito, não pagou",
+  });
+
+  if (error) {
+    if (/check|constraint|amount/i.test(error.message)) {
+      return { error: "Falta atualizar o banco: rode o SQL de acerto sem pagamento no Supabase." };
+    }
+    return { error: "Não foi possível registrar o acerto." };
+  }
+
+  revalidatePath("/colaboradores");
+  revalidatePath("/meu-vale");
+  return { success: true };
+}

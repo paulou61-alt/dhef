@@ -103,22 +103,28 @@ export default async function MeuValePage() {
           <div className="divide-y divide-slate-100">
             {movements.map((movement) => {
               const isVale = movement.movement_type === "vale";
+              // Valor zero: acerto registrado sem pagamento.
+              const isNote = Number(movement.amount) === 0;
               return (
                 <div key={movement.id} className="flex items-center gap-3 px-4 py-3.5">
-                  <span className={`flex h-10 w-10 flex-none items-center justify-center rounded-xl ${isVale ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>
-                    {isVale ? <Minus size={17} /> : <Plus size={17} />}
+                  <span className={`flex h-10 w-10 flex-none items-center justify-center rounded-xl ${isNote ? "bg-slate-100 text-slate-500" : isVale ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>
+                    {isNote ? <CalendarDays size={17} /> : isVale ? <Minus size={17} /> : <Plus size={17} />}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-slate-800">{isVale ? "Vale" : "Saldo"}</p>
+                    <p className="text-sm font-semibold text-slate-800">{isNote ? "Acerto sem pagamento" : isVale ? "Vale" : "Saldo"}</p>
                     <p className="mt-0.5 flex flex-wrap items-center gap-1 text-[11px] text-slate-500">
                       <CalendarDays size={11} />
                       {formatDate(movement.movement_date)}
                       {movement.notes ? ` · ${movement.notes}` : ""}
                     </p>
                   </div>
-                  <p className={`text-sm font-bold ${isVale ? "text-amber-700" : "text-emerald-700"}`}>
-                    {isVale ? "-" : "+"} {formatCurrency(Number(movement.amount))}
-                  </p>
+                  {isNote ? (
+                    <p className="text-sm font-bold text-slate-400">—</p>
+                  ) : (
+                    <p className={`text-sm font-bold ${isVale ? "text-amber-700" : "text-emerald-700"}`}>
+                      {isVale ? "-" : "+"} {formatCurrency(Number(movement.amount))}
+                    </p>
+                  )}
                 </div>
               );
             })}
