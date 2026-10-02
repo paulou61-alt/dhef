@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAccessContext } from "@/lib/access";
+import { todayInBrazil } from "@/utils/format";
 
 export interface CustomerFormState {
   error?: string;
@@ -123,7 +124,7 @@ export async function createCustomer(formData: FormData): Promise<CustomerFormSt
   if (!allowedMethods.has(initialPaymentMethod)) return { error: "Forma de pagamento da primeira compra inválida." };
 
   const initialInstallments = Math.max(1, Math.min(36, Number(getStringField(formData, "initial_installments_count") ?? "1") || 1));
-  const initialFirstDueDate = getStringField(formData, "initial_first_due_date") ?? new Date().toISOString().slice(0, 10);
+  const initialFirstDueDate = getStringField(formData, "initial_first_due_date") ?? todayInBrazil();
   const initialPurchaseNotes = getStringField(formData, "initial_purchase_notes");
 
   const supabase = createClient();

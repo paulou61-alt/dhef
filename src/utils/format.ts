@@ -23,3 +23,8 @@ export function daysOverdue(dueDate: string): number {
   const diff = Math.floor((today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
   return diff > 0 ? diff : 0;
 }
+
+/** Data de hoje (AAAA-MM-DD) no horário de Brasília. Só vira o dia à meia-noite daqui, não às 21h (UTC). */
+export function todayInBrazil(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+}

@@ -12,6 +12,7 @@ import {
   type PurchaseProduct,
   type PurchaseVariant,
 } from "@/components/sales/PurchaseProductSelector";
+import { todayInBrazil } from "@/utils/format";
 
 
 export interface CustomerCollaboratorOption {
@@ -66,7 +67,7 @@ export function CustomerForm({
   const [initialItems, setInitialItems] = useState<PurchaseItem[]>(() => customer ? [] : getDefaultInitialPurchase(products, variants));
   const [initialPaymentMethod, setInitialPaymentMethod] = useState("parcelado");
   const [initialInstallments, setInitialInstallments] = useState("2");
-  const [initialFirstDueDate, setInitialFirstDueDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [initialFirstDueDate, setInitialFirstDueDate] = useState(() => todayInBrazil());
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();

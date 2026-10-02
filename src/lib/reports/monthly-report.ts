@@ -3,6 +3,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { chunk, fetchAll } from "@/lib/supabase/fetch-all";
 import { getAccessContext } from "@/lib/access";
+import { todayInBrazil } from "@/utils/format";
 
 const OPEN_INSTALLMENT_STATUSES = new Set(["pendente", "parcial", "vencido"]);
 
@@ -141,7 +142,7 @@ export async function getMonthlyBusinessReport(monthValue?: string | null) {
     .filter((movement) => movement.type === "entrada")
     .reduce((sum, movement) => sum + Number(movement.amount), 0);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInBrazil();
   const openReceivablesRows = (installments ?? [])
     .filter((installment) => OPEN_INSTALLMENT_STATUSES.has(installment.status))
     .map((installment) => {

@@ -6,7 +6,7 @@ import { fetchAll } from "@/lib/supabase/fetch-all";
 import { getAccessContext } from "@/lib/access";
 import { ReceiveButton } from "@/components/finance/ReceiveButton";
 import { CollaboratorFilterSelect } from "@/components/finance/CollaboratorFilterSelect";
-import { formatCurrency, formatDate } from "@/utils/format";
+import { formatCurrency, formatDate, todayInBrazil } from "@/utils/format";
 import { whatsappLink } from "@/utils/masks";
 import { buildChargeMessage, type ChargeInstallment } from "@/utils/charge-message";
 
@@ -208,7 +208,7 @@ export default async function CobrancasPage({
                 {openItems.map((item) => {
                   const open = Number(item.amount) - Number(item.paid_amount);
                   const paid = Number(item.paid_amount);
-                  const overdue = item.status === "vencido" || item.due_date < new Date().toISOString().slice(0, 10);
+                  const overdue = item.status === "vencido" || item.due_date < todayInBrazil();
                   return (
                     <div key={item.id} className="flex flex-wrap items-center gap-3 rounded-xl bg-surface-muted p-3">
                       <div className="min-w-0 flex-1">
