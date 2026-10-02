@@ -33,6 +33,8 @@ export function ReceiveButton({
   products = [],
   variants = [],
   successHref,
+  collectors = [],
+  defaultCollectorId = "",
 }: {
   installmentId: string;
   openAmount: number;
@@ -41,12 +43,18 @@ export function ReceiveButton({
   variants?: PurchaseVariant[];
   /** Endereço aberto depois de salvar. Sem ele, a página atual é recarregada. */
   successHref?: string;
+  /** Colaboradores com cargo de cobrador. Só o proprietário recebe a lista. */
+  collectors?: { id: string; name: string }[];
+  /** Cobrador já marcado ao abrir (ex.: o responsável pela ficha do cliente). */
+  defaultCollectorId?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState(String(openAmount.toFixed(2)).replace(".", ","));
   const [method, setMethod] = useState<"pix" | "dinheiro" | "cartao">("pix");
   const [date, setDate] = useState(() => todayInBrazil());
   const [notes, setNotes] = useState("");
+  const initialCollector = collectors.some((collector) => collector.id === defaultCollectorId) ? defaultCollectorId : "";
+  const [collectorId, setCollectorId] = useState(initialCollector);
   const [nextDueDate, setNextDueDate] = useState("");
   const [purchaseItems, setPurchaseItems] = useState<PurchaseItem[]>([]);
   const [purchasePaymentMethod, setPurchasePaymentMethod] = useState("parcelado");
@@ -88,6 +96,7 @@ export function ReceiveButton({
           notes,
         };
         if (canReschedule && nextDueDate) payload.nextDueDate = nextDueDate;
+        if (collectorId) payload.collectorId = collectorId;
 
         if (hasPurchase) {
           payload.items = purchaseItems.map((item) => ({
@@ -181,6 +190,21 @@ export function ReceiveButton({
                     options={RECEIVE_METHODS}
                   />
                 </div>
+                {collectors.length > 0 && (
+                  <div>
+                    <label className="label">Quem cobrou</label>
+                    <SelectField
+                      value={collectorId}
+                      onChange={setCollectorId}
+                      options={[
+                        { value: "", label: "Eu mesmo", description: "Recebido pelo proprietário" },
+                        ...collectors.map((collector) => ({ value: collector.id, label: collector.name, description: "Cobrador" })),
+                      ]}
+                      searchable={collectors.length > 6}
+                      searchPlaceholder="Buscar cobrador..."
+                    />
+                  </div>
+                )}
                 <div>
                   <label className="label">Data</label>
                   <input className="input-field" type="date" value={date} onChange={(e) => setDate(e.target.value)} />

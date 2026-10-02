@@ -59,6 +59,11 @@ export default async function CobrancasPage({
     : "";
   const selectedCollaborator = activeCollaborators.find((collaborator) => collaborator.id === selectedCollaboratorId) ?? null;
 
+  // "Quem cobrou" no recebimento: só o proprietário escolhe, entre os cobradores ativos.
+  const collectors = access?.role === "owner"
+    ? activeCollaborators.filter((collaborator) => collaborator.role === "cobrador").map(({ id, name }) => ({ id, name }))
+    : [];
+
   const saleMap = new Map((sales ?? []).map((sale) => [sale.id, sale]));
   const customerMap = new Map((customers ?? []).map((customer) => [customer.id, customer]));
   const grouped = new Map<string, { customer: any; items: any[] }>();
@@ -230,6 +235,8 @@ export default async function CobrancasPage({
                         buttonLabel={item.isOpeningBalance ? "Receber saldo" : `Pagar ${item.installment_number}/${item.total_installments}`}
                         products={(products ?? []) as any}
                         variants={(variants ?? []) as any}
+                        collectors={collectors}
+                        defaultCollectorId={customer.assigned_collaborator_id ?? ""}
                       />
                     </div>
                   );
