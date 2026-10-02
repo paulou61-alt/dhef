@@ -1,4 +1,4 @@
-import { formatCurrency, formatDate } from "@/utils/format";
+import { formatCurrency, formatDate, todayInBrazil } from "@/utils/format";
 
 export interface ChargeInstallment {
   installmentNumber: number;
@@ -18,7 +18,7 @@ export function buildChargeMessage(customerName: string, installments: ChargeIns
     return `Olá ${customerName}, tudo bem? Consta que seus pagamentos estão em dia. Obrigado!`;
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInBrazil();
   const lines = open.map((item) => {
     const overdue = item.status === "vencido" || item.dueDate < today;
     const situation = overdue ? `vencido em ${formatDate(item.dueDate)}` : `vence em ${formatDate(item.dueDate)}`;

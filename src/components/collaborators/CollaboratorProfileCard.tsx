@@ -6,7 +6,7 @@ import { Banknote, CalendarDays, Check, Eye, HandCoins, Minus, Phone, Plus, Rece
 import { addCollaboratorValeMovement, deleteCollaboratorValeMovement, setCollaboratorValeBalance, updateCollaboratorPermissions, updateCollaboratorValeMovement } from "@/app/(app)/colaboradores/actions";
 import { RemoveCollaboratorButton } from "@/components/collaborators/RemoveCollaboratorButton";
 import { getAllowedViewPermissions, VIEW_PERMISSION_LABELS, type ViewPermission } from "@/lib/permissions";
-import { formatCurrency, formatDate } from "@/utils/format";
+import { formatCurrency, formatDate, todayInBrazil } from "@/utils/format";
 
 type Role = "vendedor" | "cobrador";
 type ValeMovement = { id: string; movement_type: "vale" | "abatimento"; amount: number; movement_date: string; notes: string | null; created_at: string };
@@ -35,7 +35,7 @@ export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissio
   const [mode, setMode] = useState<"vale" | "abatimento" | null>(null);
   const [amount, setAmount] = useState("");
   const [notes, setNotes] = useState("");
-  const [movementDate, setMovementDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [movementDate, setMovementDate] = useState(() => todayInBrazil());
   const [editingMovementId, setEditingMovementId] = useState<string | null>(null);
   const [editMovementAmount, setEditMovementAmount] = useState("");
   const [editMovementDate, setEditMovementDate] = useState("");
@@ -78,7 +78,7 @@ export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissio
   }
 
   function resetVale(next: "vale" | "abatimento" | null) {
-    setMode(next); setAmount(""); setNotes(""); setMovementDate(new Date().toISOString().slice(0, 10)); setError(null); setSuccess(null);
+    setMode(next); setAmount(""); setNotes(""); setMovementDate(todayInBrazil()); setError(null); setSuccess(null);
   }
 
   function submitVale() {

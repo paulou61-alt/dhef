@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { CloudOff } from "lucide-react";
 import { SelectField } from "@/components/ui/SelectField";
 import { submitOfflineCapableOperation } from "@/lib/offline/sync";
+import { todayInBrazil } from "@/utils/format";
 
 const EXPENSE_CATEGORIES = [
   { value: "mercadoria", label: "Mercadoria" },
@@ -18,7 +19,7 @@ export function ExpenseForm() {
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("outros");
   const [amount, setAmount] = useState("");
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => todayInBrazil());
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);

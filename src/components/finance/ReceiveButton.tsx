@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { CloudOff, ShoppingBag } from "lucide-react";
 import { submitOfflineCapableOperation } from "@/lib/offline/sync";
-import { formatCurrency } from "@/utils/format";
+import { formatCurrency, todayInBrazil } from "@/utils/format";
 import { SelectField } from "@/components/ui/SelectField";
 import {
   PurchaseProductSelector,
@@ -45,14 +45,14 @@ export function ReceiveButton({
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState(String(openAmount.toFixed(2)).replace(".", ","));
   const [method, setMethod] = useState<"pix" | "dinheiro" | "cartao">("pix");
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => todayInBrazil());
   const [notes, setNotes] = useState("");
   const [nextDueDate, setNextDueDate] = useState("");
   const [purchaseItems, setPurchaseItems] = useState<PurchaseItem[]>([]);
   const [purchasePaymentMethod, setPurchasePaymentMethod] = useState("parcelado");
   const [purchaseDownPayment, setPurchaseDownPayment] = useState("");
   const [purchaseInstallments, setPurchaseInstallments] = useState("2");
-  const [purchaseFirstDueDate, setPurchaseFirstDueDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [purchaseFirstDueDate, setPurchaseFirstDueDate] = useState(() => todayInBrazil());
   const [purchaseNotes, setPurchaseNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -70,7 +70,7 @@ export function ReceiveButton({
     setPurchasePaymentMethod("parcelado");
     setPurchaseDownPayment("");
     setPurchaseInstallments("2");
-    setPurchaseFirstDueDate(new Date().toISOString().slice(0, 10));
+    setPurchaseFirstDueDate(todayInBrazil());
     setPurchaseNotes("");
   }
 

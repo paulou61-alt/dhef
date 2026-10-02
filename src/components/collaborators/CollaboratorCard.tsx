@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { addCollaboratorValeMovement } from "@/app/(app)/colaboradores/actions";
 import { RemoveCollaboratorButton } from "@/components/collaborators/RemoveCollaboratorButton";
-import { formatCurrency, formatDate } from "@/utils/format";
+import { formatCurrency, formatDate, todayInBrazil } from "@/utils/format";
 
 type CollaboratorRole = "vendedor" | "cobrador";
 type ValeMovement = {
@@ -64,7 +64,7 @@ export function CollaboratorCard({
   const [mode, setMode] = useState<"vale" | "abatimento" | null>(null);
   const [amount, setAmount] = useState("");
   const [notes, setNotes] = useState("");
-  const [movementDate, setMovementDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [movementDate, setMovementDate] = useState(() => todayInBrazil());
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -88,7 +88,7 @@ export function CollaboratorCard({
     setMode(nextMode);
     setAmount("");
     setNotes("");
-    setMovementDate(new Date().toISOString().slice(0, 10));
+    setMovementDate(todayInBrazil());
     setError(null);
   }
 

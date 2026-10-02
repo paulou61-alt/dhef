@@ -6,7 +6,7 @@ import { CloudOff, Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
 import { SelectField, type SelectOption } from "@/components/ui/SelectField";
 import { setCachedValue } from "@/lib/offline/db";
 import { submitOfflineCapableOperation } from "@/lib/offline/sync";
-import { formatCurrency } from "@/utils/format";
+import { formatCurrency, todayInBrazil } from "@/utils/format";
 
 type Customer = { id: string; name: string };
 type Product = { id: string; name: string; sale_price: number };
@@ -73,7 +73,7 @@ export function SaleForm({
   const [paymentMethod, setPaymentMethod] = useState("parcelado");
   const [downPayment, setDownPayment] = useState("");
   const [installmentsCount, setInstallmentsCount] = useState("2");
-  const [firstDueDate, setFirstDueDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [firstDueDate, setFirstDueDate] = useState(() => todayInBrazil());
   const [notes, setNotes] = useState("");
   const [selectedVariant, setSelectedVariant] = useState(() => getDefaultVariantId(products, variants));
   const [items, setItems] = useState<CartItem[]>([]);

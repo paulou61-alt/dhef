@@ -6,6 +6,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "@/lib/supabase/config";
 import { getAccessContext } from "@/lib/access";
 import { collaboratorLimit, companyHasFeature, getSubscription } from "@/lib/billing/subscription";
 import { getDefaultViewPermissions, normalizeViewPermissions, type ViewPermission } from "@/lib/permissions";
+import { todayInBrazil } from "@/utils/format";
 
 export interface CreateCollaboratorInput {
   name: string;
@@ -304,7 +305,7 @@ export async function addCollaboratorValeMovement(
     collaborator_id: collaboratorId,
     movement_type: movementType,
     amount: Number(amount.toFixed(2)),
-    movement_date: input.movementDate || new Date().toISOString().slice(0, 10),
+    movement_date: input.movementDate || todayInBrazil(),
     notes,
   });
 
@@ -329,7 +330,7 @@ export async function updateCollaboratorValeMovement(
   const movementId = input.movementId?.trim();
   const collaboratorId = input.collaboratorId?.trim();
   const amount = Number(input.amount);
-  const movementDate = input.movementDate || new Date().toISOString().slice(0, 10);
+  const movementDate = input.movementDate || todayInBrazil();
   const notes = input.notes?.trim().slice(0, 240) || null;
 
   if (!movementId || !collaboratorId) return { error: "Lançamento inválido." };
@@ -436,7 +437,7 @@ export async function setCollaboratorValeBalance(input: {
     collaborator_id: collaboratorId,
     movement_type: difference > 0 ? "abatimento" : "vale",
     amount: Math.abs(difference),
-    movement_date: new Date().toISOString().slice(0, 10),
+    movement_date: todayInBrazil(),
     notes: "Ajuste manual de saldo",
   });
 

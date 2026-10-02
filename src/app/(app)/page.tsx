@@ -20,7 +20,7 @@ import { getAccessContext } from "@/lib/access";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { OverdueList, type OverdueItem } from "@/components/dashboard/OverdueList";
 import { SimpleList, type SimpleListItem } from "@/components/dashboard/SimpleList";
-import { formatCurrency, formatDate } from "@/utils/format";
+import { formatCurrency, formatDate, todayInBrazil } from "@/utils/format";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +51,7 @@ export default async function DashboardPage() {
   const access = await getAccessContext();
   const today = startOfToday();
   const monthStart = startOfMonth();
-  const todayDate = new Date().toISOString().slice(0, 10);
+  const todayDate = todayInBrazil();
   const in7days = daysFromNow(7);
 
   const [
