@@ -79,6 +79,29 @@ export async function POST(request: Request) {
       }
     }
 
+    // Cobrador escolhido pelo proprietário no recebimento ("Quem cobrou").
+    const collectorId = operation.payload?.collectorId;
+    if (
+      (operation.type === "payment" || operation.type === "payment_purchase")
+      && !payload.alreadyProcessed
+      && typeof collectorId === "string"
+      && collectorId
+    ) {
+      const { error: collectorError } = await supabase.rpc("set_payment_collector", {
+        p_installment_id: operation.payload.installmentId,
+        p_collector_id: collectorId,
+      });
+      if (collectorError) {
+        results.push({
+          id: operation.id,
+          success: true,
+          resultId: payload.resultId ?? null,
+          warning: "Recebimento salvo, mas não foi possível registrar quem cobrou.",
+        });
+        continue;
+      }
+    }
+
     // Vencimento escolhido para o saldo que ficou em aberto depois do recebimento.
     const nextDueDate = operation.payload?.nextDueDate;
     if (

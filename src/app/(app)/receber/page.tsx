@@ -2,6 +2,7 @@ import { CheckCircle2, Search } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { ReceiveButton } from "@/components/finance/ReceiveButton";
+import { getAccessContext } from "@/lib/access";
 import { CollaboratorFilterSelect } from "@/components/finance/CollaboratorFilterSelect";
 import { formatCurrency, formatDate } from "@/utils/format";
 
@@ -83,12 +84,18 @@ export default async function ReceberPage({
     fetchAll((from, to) =>
       supabase.from("customers").select("id, name, phone, whatsapp, ficha_number, assigned_collaborator_id").order("id").range(from, to)
     ),
-    supabase.from("collaborators").select("id, name").order("name"),
+    supabase.from("collaborators").select("id, name, role, is_active").order("name"),
     fetchAll((from, to) => supabase.from("products").select("id, name, sale_price").eq("is_active", true).order("name").order("id").range(from, to)),
     fetchAll((from, to) =>
       supabase.from("product_variants").select("id, product_id, variant_name, stock_quantity, sale_price").order("variant_name").order("id").range(from, to)
     ),
   ]);
+
+  // "Quem cobrou" no recebimento: só o proprietário escolhe, entre os cobradores ativos.
+  const access = await getAccessContext();
+  const collectors = access?.role === "owner"
+    ? (collaborators ?? []).filter((collaborator) => collaborator.role === "cobrador" && collaborator.is_active).map(({ id, name }) => ({ id, name }))
+    : [];
 
   const saleMap = new Map<string, SaleSummary>(
     (sales ?? []).map((sale) => [sale.id, sale as SaleSummary]),
@@ -342,6 +349,8 @@ export default async function ReceberPage({
                               products={(products ?? []) as any}
                               variants={(variants ?? []) as any}
                               successHref={successHrefFor(debtor.key)}
+                              collectors={collectors}
+                              defaultCollectorId={debtor.customer?.assigned_collaborator_id ?? ""}
                             />
                           </div>
                         </div>
