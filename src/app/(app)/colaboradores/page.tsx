@@ -120,10 +120,6 @@ export default async function ColaboradoresPage({ searchParams }: { searchParams
         <p className="mt-1 text-sm text-slate-500">Gerencie a equipe, as visualizações, vendas e vales de cada colaborador.</p>
       </div>
 
-      <CollectionsByCollector ownerId={access.ownerId} collaborators={allCollaboratorsResult.data ?? []} filter={searchParams} />
-
-      <CollaboratorForm canCustomizePermissions={features.has("permissoes")} />
-
       <div className="card !p-0">
         <div className="border-b border-slate-100 px-4 py-3">
           <h2 className="text-sm font-bold text-slate-900">Equipe cadastrada</h2>
@@ -179,6 +175,10 @@ export default async function ColaboradoresPage({ searchParams }: { searchParams
           />
         )}
       </div>
+
+      <CollectionsByCollector ownerId={access.ownerId} collaborators={allCollaboratorsResult.data ?? []} filter={searchParams} />
+
+      <CollaboratorForm canCustomizePermissions={features.has("permissoes")} />
     </div>
   );
 }
