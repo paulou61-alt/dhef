@@ -53,7 +53,7 @@ export async function POST(request: Request) {
       if (raw.includes("Estoque insuficiente")) message = raw;
       else if (raw.includes("já está em uso por outro cliente")) message = raw;
       else if (raw.includes("saldo total em aberto")) message = "O pagamento é maior que tudo o que o cliente deve.";
-      else if (raw.includes("maior que o saldo")) message = "O pagamento é maior que o saldo atual da parcela.";
+      else if (raw.includes("maior que o saldo")) message = "O pagamento é maior que o saldo atual da parcela. Se o recebimento tem nova compra junto, rode no Supabase o SQL de \"Receber + vender\".";
       else if (raw.includes("Sessão expirada")) message = "Sessão expirada. Faça login novamente.";
       else if (raw.includes("Entrada")) message = raw;
       else if (raw.includes("carteira deste cobrador")) message = "Este cliente não pertence mais à carteira deste cobrador.";
