@@ -3,7 +3,7 @@ import { CalendarDays, HandCoins, Minus, Plus, ShieldCheck } from "lucide-react"
 import { createClient } from "@/lib/supabase/server";
 import { getAccessContext } from "@/lib/access";
 import { featureGate } from "@/lib/billing/gate";
-import { formatCurrency, formatDate } from "@/utils/format";
+import { formatCurrency, formatDate, todayInBrazil } from "@/utils/format";
 
 export const dynamic = "force-dynamic";
 
@@ -32,14 +32,27 @@ export default async function MeuValePage() {
     .order("movement_date", { ascending: false })
     .order("created_at", { ascending: false });
 
-  const movements = (data ?? []) as ValeMovement[];
+  const allMovements = (data ?? []) as ValeMovement[];
+  const signed = (movement: ValeMovement) =>
+    movement.movement_type === "vale" ? -Number(movement.amount ?? 0) : Number(movement.amount ?? 0);
+
+  // A cada mês o histórico recomeça: aparecem só os lançamentos do mês atual.
+  // O que sobrou dos meses anteriores entra como "Saldo anterior".
+  const today = todayInBrazil();
+  const monthStart = `${today.slice(0, 7)}-01`;
+  const monthLabel = new Date(`${monthStart}T12:00:00Z`).toLocaleDateString("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" });
+  const movements = allMovements.filter((movement) => movement.movement_date >= monthStart);
+  const previousBalance = allMovements
+    .filter((movement) => movement.movement_date < monthStart)
+    .reduce((sum, movement) => sum + signed(movement), 0);
+
   const totalVales = movements
     .filter((movement) => movement.movement_type === "vale")
     .reduce((sum, movement) => sum + Number(movement.amount ?? 0), 0);
   const totalSaldo = movements
     .filter((movement) => movement.movement_type === "abatimento")
     .reduce((sum, movement) => sum + Number(movement.amount ?? 0), 0);
-  const balance = totalSaldo - totalVales;
+  const balance = previousBalance + totalSaldo - totalVales;
 
   return (
     <div className="space-y-4">
@@ -64,7 +77,15 @@ export default async function MeuValePage() {
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-2xl border border-slate-100 bg-white p-4">
+          <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+            <CalendarDays size={15} /> Saldo anterior
+          </div>
+          <p className={`mt-2 text-xl font-bold ${previousBalance < 0 ? "text-danger" : "text-slate-900"}`}>{formatCurrency(previousBalance)}</p>
+          <p className="mt-1 text-[11px] text-slate-500">Até o fim do mês passado.</p>
+        </div>
+
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
           <div className="flex items-center gap-2 text-xs font-semibold text-amber-700">
             <HandCoins size={15} /> Saldo atual
@@ -75,14 +96,14 @@ export default async function MeuValePage() {
 
         <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-            <Minus size={15} /> Total em vales
+            <Minus size={15} /> Vales no mês
           </div>
           <p className="mt-2 text-xl font-bold text-slate-900">{formatCurrency(totalVales)}</p>
         </div>
 
         <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
           <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700">
-            <Plus size={15} /> Total em saldo
+            <Plus size={15} /> Saldo no mês
           </div>
           <p className="mt-2 text-xl font-bold text-emerald-900">{formatCurrency(totalSaldo)}</p>
         </div>
@@ -90,14 +111,14 @@ export default async function MeuValePage() {
 
       <section className="card !p-0">
         <div className="border-b border-slate-100 px-4 py-3">
-          <h2 className="text-sm font-bold text-slate-900">Histórico do meu vale</h2>
-          <p className="mt-0.5 text-xs text-slate-500">Todos os lançamentos de Vale e Saldo registrados para você.</p>
+          <h2 className="text-sm font-bold text-slate-900">Lançamentos de {monthLabel}</h2>
+          <p className="mt-0.5 text-xs text-slate-500">O histórico recomeça todo mês. O que ficou de meses anteriores aparece em &quot;Saldo anterior&quot;.</p>
         </div>
 
         {movements.length === 0 ? (
           <div className="py-12 text-center">
             <HandCoins className="mx-auto mb-2 text-slate-300" size={30} />
-            <p className="text-sm text-slate-500">Nenhuma movimentação de vale registrada.</p>
+            <p className="text-sm text-slate-500">Nenhum lançamento neste mês.</p>
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
