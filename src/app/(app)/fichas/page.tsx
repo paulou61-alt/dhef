@@ -31,11 +31,20 @@ export default async function FichasPage({ searchParams }: { searchParams: Searc
   function customerQuery(from: number, to: number) {
     let builder = supabase
       .from("customers")
-      .select("id, name, phone, city, ficha_number, assigned_collaborator_id");
+      .select("id, name, phone, address, house_number, neighborhood, city, ficha_number, assigned_collaborator_id");
 
     if (query) {
       if (/^\d+$/.test(query)) builder = builder.eq("ficha_number", Number(query));
-      else builder = builder.ilike("name", `%${query}%`);
+      else {
+        // Busca pelo nome ou pelo endereço (rua, bairro ou cidade).
+        // Pontos, vírgulas e parênteses atrapalham o filtro; viram "qualquer coisa" (ex.: "R. São" acha "R. São José").
+        const term = query.replace(/[,()%\\:."]/g, "*").replace(/\*+/g, "*").replace(/^\*|\*$/g, "").trim();
+        if (term) {
+          builder = builder.or(
+            ["name", "address", "neighborhood", "city"].map((column) => `${column}.ilike.*${term}*`).join(",")
+          );
+        }
+      }
     }
     if (!isOwner && access?.collaboratorId) {
       builder = builder.eq("assigned_collaborator_id", access.collaboratorId);
@@ -111,7 +120,7 @@ export default async function FichasPage({ searchParams }: { searchParams: Searc
         <p className="mt-1 text-sm text-slate-500">{isOwner ? "Fichas numeradas e organizadas por colaborador responsável." : "Aqui aparecem somente as fichas de clientes vinculados a você."}</p>
       </div>
 
-      <SearchBar placeholder="Buscar por nome ou número da ficha..." />
+      <SearchBar placeholder="Buscar por nome, endereço, bairro ou número da ficha..." />
 
       {isOwner && (
         <div className="flex gap-2 overflow-x-auto pb-1">
@@ -161,6 +170,11 @@ export default async function FichasPage({ searchParams }: { searchParams: Searc
                         <span className={`flex h-11 min-w-11 items-center justify-center rounded-xl px-2 text-xs font-bold ${released ? "bg-slate-100 text-slate-400" : "bg-brand-50 text-brand-700"}`}>#{customer.ficha_number}</span>
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-semibold text-slate-800">{customer.name}</p>
+                          {(customer.address || customer.neighborhood) && (
+                            <p className="truncate text-xs text-slate-500">
+                              {[customer.address ? `${customer.address}${customer.house_number ? `, ${customer.house_number}` : ""}` : null, customer.neighborhood].filter(Boolean).join(" · ")}
+                            </p>
+                          )}
                           <p className="text-xs text-slate-500">{stats.count} compra(s) · {formatCurrency(stats.total)} comprado</p>
                         </div>
                         {open > 0 ? (
