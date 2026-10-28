@@ -12,6 +12,7 @@ import { CollectionsByCollector, type CollectionsFilter } from "@/components/col
 import { SettleCollaboratorButton } from "@/components/collaborators/SettleCollaboratorButton";
 import { EditCollaboratorButton } from "@/components/collaborators/EditCollaboratorButton";
 import { normalizeViewPermissions } from "@/lib/permissions";
+import { todayInBrazil } from "@/utils/format";
 
 export const dynamic = "force-dynamic";
 
@@ -103,6 +104,22 @@ export default async function ColaboradoresPage({ searchParams }: { searchParams
     collectionTotals.set(payment.collected_by_collaborator_id, (collectionTotals.get(payment.collected_by_collaborator_id) ?? 0) + Number(payment.amount ?? 0));
   }
 
+  // Resumo do mês atual: quanto cada colaborador pegou (vales) e quanto ganhou (saldo/comissão).
+  // Devoluções feitas pelo colaborador não contam como ganho.
+  const monthStart = `${todayInBrazil().slice(0, 7)}-01`;
+  const isRepayment = (notes: string | null) =>
+    Boolean(notes && (notes.startsWith("Devolvido pelo colaborador") || notes.startsWith("Quitação manual · recebido do colaborador")));
+  const monthTotals = new Map<string, { taken: number; earned: number }>();
+  for (const movement of valeMovements) {
+    if (movement.movement_date < monthStart) continue;
+    const amount = Number(movement.amount ?? 0);
+    if (amount <= 0) continue;
+    const current = monthTotals.get(movement.collaborator_id) ?? { taken: 0, earned: 0 };
+    if (movement.movement_type === "vale") current.taken += amount;
+    else if (!isRepayment(movement.notes)) current.earned += amount;
+    monthTotals.set(movement.collaborator_id, current);
+  }
+
   const valesByCollaborator = new Map<string, ValeMovement[]>();
   const valeBalances = new Map<string, number>();
   for (const movement of valeMovements) {
@@ -153,6 +170,8 @@ export default async function ColaboradoresPage({ searchParams }: { searchParams
                     salesCount={salesMetric.count}
                     collectionsTotal={collectionTotals.get(collaborator.id) ?? 0}
                     valeBalance={valeBalances.get(collaborator.id) ?? 0}
+                    monthTaken={monthTotals.get(collaborator.id)?.taken ?? 0}
+                    monthEarned={monthTotals.get(collaborator.id)?.earned ?? 0}
                     valeMovements={valesByCollaborator.get(collaborator.id) ?? []}
                     valesEnabled={features.has("vales")}
                     permissionsEnabled={features.has("permissoes")}
