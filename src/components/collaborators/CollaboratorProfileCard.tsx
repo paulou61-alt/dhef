@@ -18,6 +18,10 @@ type Props = {
   salesCount: number;
   collectionsTotal: number;
   valeBalance: number;
+  /** Vales pegos no mês atual. */
+  monthTaken?: number;
+  /** Saldo/comissão ganho no mês atual. */
+  monthEarned?: number;
   /** Plano inclui controle de vales. */
   valesEnabled?: boolean;
   /** Plano permite escolher o que cada colaborador vê. */
@@ -29,7 +33,7 @@ type Props = {
 
 const ROLE_LABELS: Record<Role, string> = { vendedor: "Vendedor", cobrador: "Cobrador" };
 
-export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissions, salesCount, collectionsTotal, valeBalance, valeMovements, username, actions, valesEnabled = true, permissionsEnabled = true }: Props) {
+export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissions, salesCount, collectionsTotal, valeBalance, monthTaken = 0, monthEarned = 0, valeMovements, username, actions, valesEnabled = true, permissionsEnabled = true }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"vale" | "abatimento" | null>(null);
@@ -172,8 +176,25 @@ export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissio
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-bold text-slate-900">{collaborator.name}</p>
           <p className="truncate text-xs text-slate-500">{ROLE_LABELS[collaborator.role]}{collaborator.phone ? ` · ${collaborator.phone}` : ""}</p>
+          {valesEnabled && (
+            <p className="mt-0.5 text-[11px] text-slate-500 sm:hidden">
+              Mês: pegou <span className="font-semibold text-amber-700">{formatCurrency(monthTaken)}</span> · ganhou <span className="font-semibold text-emerald-700">{formatCurrency(monthEarned)}</span>
+            </p>
+          )}
           <p className="mt-0.5 text-[11px] font-medium text-brand-600">Ver vendas, vales e permissões ›</p>
         </div>
+        {valesEnabled && (
+        <div className="hidden flex-none gap-5 text-right sm:flex">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Pegou no mês</p>
+            <p className="text-sm font-bold text-amber-700">{formatCurrency(monthTaken)}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Ganhou no mês</p>
+            <p className="text-sm font-bold text-emerald-700">{formatCurrency(monthEarned)}</p>
+          </div>
+        </div>
+        )}
         {valesEnabled && (
         <div className="flex-none text-right">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Saldo de vale</p>
@@ -236,6 +257,8 @@ export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissio
             </div>
             )}
             <Metric icon={<ReceiptText size={15} />} label="Recebido em cobranças" value={formatCurrency(collectionsTotal)} />
+            {valesEnabled && <Metric icon={<Minus size={15} />} label="Pegou no mês (vales)" value={formatCurrency(monthTaken)} />}
+            {valesEnabled && <Metric icon={<Plus size={15} />} label="Ganhou no mês" value={formatCurrency(monthEarned)} helper="Saldo e comissões" />}
             {valesEnabled && <Metric icon={<Banknote size={15} />} label="Movimentações de vale" value={String(valeMovements.length)} />}
           </div>
 
