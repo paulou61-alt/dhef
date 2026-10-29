@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ChevronDown, ChevronRight, CircleCheckBig, ClipboardList, Users } from "lucide-react";
+import { ChevronDown, ChevronRight, CircleCheckBig, ClipboardList, Plus, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { getAccessContext } from "@/lib/access";
@@ -10,6 +10,13 @@ import { formatCurrency } from "@/utils/format";
 export const dynamic = "force-dynamic";
 
 type SearchParams = { q?: string; colaborador?: string };
+
+// Link para cadastrar cliente já com o número da ficha e o colaborador do grupo.
+function newCustomerHref(number: number, groupKey: string) {
+  const params = new URLSearchParams({ ficha: String(number) });
+  if (groupKey !== "sem") params.set("colaborador", groupKey);
+  return `/clientes/novo?${params.toString()}`;
+}
 
 function categoryHref(id: string | null, query: string) {
   const params = new URLSearchParams();
@@ -182,7 +189,7 @@ export default async function FichasPage({ searchParams }: { searchParams: Searc
                 </div>
 
                 {showAvailable && (
-                  <details className="group border-b border-emerald-100 bg-emerald-50/60 px-4 py-3">
+                  <details open className="group border-b border-emerald-100 bg-emerald-50/60 px-4 py-3">
                     <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold text-emerald-800">
                       <span className="flex items-center gap-2"><CircleCheckBig size={15} /> Fichas disponíveis para novos clientes ({availableCount})</span>
                       <ChevronDown size={16} className="transition group-open:rotate-180" />
@@ -193,9 +200,14 @@ export default async function FichasPage({ searchParams }: { searchParams: Searc
                           <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">Liberadas (cliente quitou)</p>
                           <div className="flex flex-wrap gap-1.5">
                             {releasedNumbers.map(([number, name]) => (
-                              <span key={number} title={`Era de ${name}`} className="rounded-lg border border-emerald-200 bg-white px-2 py-1 text-xs font-bold text-emerald-700">
-                                #{number} <span className="font-normal text-emerald-600/80">· era de {name.split(" ")[0]}</span>
-                              </span>
+                              <Link
+                                key={number}
+                                href={newCustomerHref(number, key)}
+                                title={`Cadastrar cliente na ficha #${number} (era de ${name})`}
+                                className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-white px-2.5 py-1.5 text-xs font-bold text-emerald-700 shadow-sm transition hover:border-emerald-500 hover:bg-emerald-600 hover:text-white"
+                              >
+                                <Plus size={12} /> Ficha #{number} <span className="font-normal opacity-80">· era de {name.split(" ")[0]}</span>
+                              </Link>
                             ))}
                           </div>
                         </div>
@@ -205,13 +217,23 @@ export default async function FichasPage({ searchParams }: { searchParams: Searc
                           <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Números sem uso na sequência (até #{highest})</p>
                           <div className="flex flex-wrap gap-1.5">
                             {gapNumbers.slice(0, 60).map((number) => (
-                              <span key={number} className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-slate-600">#{number}</span>
+                              <Link
+                                key={number}
+                                href={newCustomerHref(number, key)}
+                                title={`Cadastrar cliente na ficha #${number}`}
+                                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-600 shadow-sm transition hover:border-brand-500 hover:bg-brand-500 hover:text-white"
+                              >
+                                <Plus size={12} /> Ficha #{number}
+                              </Link>
                             ))}
                             {gapNumbers.length > 60 && <span className="px-1 py-1 text-xs text-slate-500">e mais {gapNumbers.length - 60}</span>}
                           </div>
                         </div>
                       )}
-                      <p className="text-[11px] text-emerald-700">Próximo número novo depois da sequência: #{highest + 1}.</p>
+                      <p className="text-[11px] text-emerald-700">
+                        Toque numa ficha para cadastrar o cliente já com esse número.{" "}
+                        <Link href={newCustomerHref(highest + 1, key)} className="font-semibold underline">Próximo número novo: #{highest + 1}</Link>
+                      </p>
                     </div>
                   </details>
                 )}

@@ -54,7 +54,7 @@ export function CustomerForm({
   variants?: PurchaseVariant[];
   accessRole?: "owner" | "vendedor" | "cobrador";
   /** Cidade e estado do negócio (Configurações), usados como padrão em cliente novo. */
-  defaults?: { city: string | null; state: string | null };
+  defaults?: { city?: string | null; state?: string | null; fichaNumber?: number | null; collaboratorId?: string | null };
 }) {
   const [phone, setPhone] = useState(customer?.phone ?? "");
   const [whatsapp, setWhatsapp] = useState(customer?.whatsapp ?? "");
@@ -110,7 +110,7 @@ export function CustomerForm({
               readOnly={fichaLocked}
               className={`input-field font-semibold ${fichaLocked ? "cursor-not-allowed bg-slate-50 text-slate-500" : ""}`}
               placeholder="Ex.: 25"
-              defaultValue={customer?.ficha_number ?? ""}
+              defaultValue={customer?.ficha_number ?? defaults?.fichaNumber ?? ""}
             />
             <p className="mt-1 text-[11px] text-slate-400">
               {!customer
@@ -154,14 +154,14 @@ export function CustomerForm({
             <SelectField
               id="assigned_collaborator_id"
               name="assigned_collaborator_id"
-              defaultValue={customer?.assigned_collaborator_id ?? ""}
+              defaultValue={customer?.assigned_collaborator_id ?? defaults?.collaboratorId ?? ""}
               searchable
               searchPlaceholder="Buscar colaborador..."
               options={[
                 { value: "", label: "Sem colaborador" },
                 // Só cobradores. Na edição, mantém o responsável atual mesmo que não seja cobrador.
                 ...collaborators
-                  .filter((collaborator) => collaborator.role === "cobrador" || collaborator.id === customer?.assigned_collaborator_id)
+                  .filter((collaborator) => collaborator.role === "cobrador" || collaborator.id === (customer?.assigned_collaborator_id ?? defaults?.collaboratorId))
                   .map((collaborator) => ({
                     value: collaborator.id,
                     label: collaborator.name,

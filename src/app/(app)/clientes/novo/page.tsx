@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { getAccessContext } from "@/lib/access";
 
-export default async function NovoClientePage() {
+export default async function NovoClientePage({ searchParams }: { searchParams: { ficha?: string; colaborador?: string } }) {
   const access = await getAccessContext();
   if (!access) redirect("/login");
   if (access.role === "cobrador") redirect("/cobrancas");
@@ -41,7 +41,12 @@ export default async function NovoClientePage() {
         products={(products ?? []) as any}
         variants={(variants ?? []) as any}
         accessRole={access.role}
-        defaults={businessDefaults ?? undefined}
+        defaults={{
+          ...(businessDefaults ?? {}),
+          // Vindo de "Fichas disponíveis": já abre com o número e o colaborador da ficha.
+          fichaNumber: /^\d{1,4}$/.test(searchParams.ficha ?? "") ? Number(searchParams.ficha) : null,
+          collaboratorId: (collaborators ?? []).some((collaborator) => collaborator.id === searchParams.colaborador) ? searchParams.colaborador : null,
+        }}
       />
     </div>
   );
