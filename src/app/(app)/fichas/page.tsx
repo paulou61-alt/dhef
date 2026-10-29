@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ClipboardList, ChevronRight, Users } from "lucide-react";
+import { ChevronDown, ChevronRight, CircleCheckBig, ClipboardList, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { getAccessContext } from "@/lib/access";
@@ -145,6 +145,26 @@ export default async function FichasPage({ searchParams }: { searchParams: Searc
             const groupCustomers = grouped.get(key) ?? [];
             const releasedCount = groupCustomers.filter((customer) => isReleased(customer.id)).length;
             const activeCount = groupCustomers.length - releasedCount;
+
+            // Fichas disponíveis para novos clientes neste grupo:
+            // números de clientes que quitaram (e ainda não foram reaproveitados) e números pulados na sequência.
+            const activeNumbers = new Set(
+              groupCustomers
+                .filter((customer) => !isReleased(customer.id) && customer.ficha_number != null)
+                .map((customer) => Number(customer.ficha_number))
+            );
+            const releasedByNumber = new Map<number, string>();
+            groupCustomers
+              .filter((customer) => isReleased(customer.id) && customer.ficha_number != null && !activeNumbers.has(Number(customer.ficha_number)))
+              .forEach((customer) => releasedByNumber.set(Number(customer.ficha_number), customer.name));
+            const releasedNumbers = [...releasedByNumber.entries()].sort((a, b) => a[0] - b[0]);
+            const highest = Math.max(0, ...activeNumbers);
+            const gapNumbers: number[] = [];
+            for (let n = 1; n < highest; n += 1) {
+              if (!activeNumbers.has(n) && !releasedByNumber.has(n)) gapNumbers.push(n);
+            }
+            const availableCount = releasedNumbers.length + gapNumbers.length;
+            const showAvailable = !query && availableCount > 0;
             const collaborator = key === "sem" ? null : collaboratorMap.get(key);
             return (
               <section key={key} className="card !p-0 overflow-hidden">
@@ -155,10 +175,46 @@ export default async function FichasPage({ searchParams }: { searchParams: Searc
                     <p className="text-[11px] text-slate-500">
                       {activeCount} ficha(s) ativa(s)
                       {releasedCount > 0 && ` · ${releasedCount} quitada(s)`}
+                      {!query && availableCount > 0 && ` · ${availableCount} disponível(is)`}
                     </p>
                   </div>
                   {collaborator && <span className="text-[11px] font-semibold text-slate-400">{collaborator.role === "vendedor" ? "Vendedor" : "Cobrador"}</span>}
                 </div>
+
+                {showAvailable && (
+                  <details className="group border-b border-emerald-100 bg-emerald-50/60 px-4 py-3">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold text-emerald-800">
+                      <span className="flex items-center gap-2"><CircleCheckBig size={15} /> Fichas disponíveis para novos clientes ({availableCount})</span>
+                      <ChevronDown size={16} className="transition group-open:rotate-180" />
+                    </summary>
+                    <div className="mt-3 space-y-3">
+                      {releasedNumbers.length > 0 && (
+                        <div>
+                          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">Liberadas (cliente quitou)</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {releasedNumbers.map(([number, name]) => (
+                              <span key={number} title={`Era de ${name}`} className="rounded-lg border border-emerald-200 bg-white px-2 py-1 text-xs font-bold text-emerald-700">
+                                #{number} <span className="font-normal text-emerald-600/80">· era de {name.split(" ")[0]}</span>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {gapNumbers.length > 0 && (
+                        <div>
+                          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Números sem uso na sequência (até #{highest})</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {gapNumbers.slice(0, 60).map((number) => (
+                              <span key={number} className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-slate-600">#{number}</span>
+                            ))}
+                            {gapNumbers.length > 60 && <span className="px-1 py-1 text-xs text-slate-500">e mais {gapNumbers.length - 60}</span>}
+                          </div>
+                        </div>
+                      )}
+                      <p className="text-[11px] text-emerald-700">Próximo número novo depois da sequência: #{highest + 1}.</p>
+                    </div>
+                  </details>
+                )}
 
                 <div className="divide-y divide-slate-100">
                   {groupCustomers.map((customer) => {
