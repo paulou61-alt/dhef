@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ChevronDown, ChevronRight, CircleCheckBig, ClipboardList, Plus, Users } from "lucide-react";
+import { ChevronRight, CircleCheckBig, ClipboardList, Plus, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { getAccessContext } from "@/lib/access";
@@ -120,6 +120,30 @@ export default async function FichasPage({ searchParams }: { searchParams: Searc
     return (collaboratorMap.get(a)?.name ?? "").localeCompare(collaboratorMap.get(b)?.name ?? "", "pt-BR");
   });
 
+  // Fichas disponíveis para novos clientes, por colaborador:
+  // números de clientes que quitaram (e ainda não foram reaproveitados) e números pulados na sequência.
+  const availabilityByGroup = new Map<string, { released: [number, string][]; gaps: number[]; highest: number; count: number }>();
+  groupKeys.forEach((key) => {
+    const groupCustomers = grouped.get(key) ?? [];
+    const activeNumbers = new Set(
+      groupCustomers
+        .filter((customer) => !isReleased(customer.id) && customer.ficha_number != null)
+        .map((customer) => Number(customer.ficha_number))
+    );
+    const releasedByNumber = new Map<number, string>();
+    groupCustomers
+      .filter((customer) => isReleased(customer.id) && customer.ficha_number != null && !activeNumbers.has(Number(customer.ficha_number)))
+      .forEach((customer) => releasedByNumber.set(Number(customer.ficha_number), customer.name));
+    const highest = Math.max(0, ...activeNumbers);
+    const gaps: number[] = [];
+    for (let n = 1; n < highest; n += 1) {
+      if (!activeNumbers.has(n) && !releasedByNumber.has(n)) gaps.push(n);
+    }
+    const released = [...releasedByNumber.entries()].sort((x, y) => x[0] - y[0]);
+    availabilityByGroup.set(key, { released, gaps, highest, count: released.length + gaps.length });
+  });
+  const totalAvailable = [...availabilityByGroup.values()].reduce((sum, group) => sum + group.count, 0);
+
   return (
     <div className="space-y-4">
       <div>
@@ -141,6 +165,63 @@ export default async function FichasPage({ searchParams }: { searchParams: Searc
         </div>
       )}
 
+      {!query && groupKeys.length > 0 && (
+        <section className="card !p-0 overflow-hidden border border-emerald-200">
+          <div className="flex items-center gap-2 border-b border-emerald-100 bg-emerald-50 px-4 py-3">
+            <CircleCheckBig size={17} className="text-emerald-600" />
+            <div className="flex-1">
+              <p className="text-sm font-bold text-emerald-900">Fichas disponíveis para novos clientes</p>
+              <p className="text-[11px] text-emerald-700">
+                {totalAvailable > 0 ? `${totalAvailable} ficha(s) livre(s). Toque numa ficha para cadastrar o cliente já com esse número.` : "Nenhuma ficha liberada no momento. Use o próximo número da sequência."}
+              </p>
+            </div>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {groupKeys.map((key) => {
+              const info = availabilityByGroup.get(key);
+              if (!info) return null;
+              const collaborator = key === "sem" ? null : collaboratorMap.get(key);
+              const chips = [
+                ...info.released.map(([number, name]) => ({ number, name })),
+                ...info.gaps.map((number) => ({ number, name: null as string | null })),
+              ].sort((x, y) => x.number - y.number);
+              return (
+                <div key={key} className="px-4 py-3">
+                  <p className="mb-2 text-xs font-bold text-slate-700">
+                    {collaborator?.name ?? "Sem colaborador"}
+                    <span className="ml-1 font-normal text-slate-400">· {info.count} disponível(is)</span>
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {chips.slice(0, 40).map(({ number, name }) => (
+                      <Link
+                        key={number}
+                        href={newCustomerHref(number, key)}
+                        title={name ? `Cadastrar cliente na ficha #${number} (era de ${name})` : `Cadastrar cliente na ficha #${number}`}
+                        className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-bold shadow-sm transition ${
+                          name
+                            ? "border-emerald-300 bg-white text-emerald-700 hover:border-emerald-600 hover:bg-emerald-600 hover:text-white"
+                            : "border-slate-200 bg-white text-slate-600 hover:border-brand-500 hover:bg-brand-500 hover:text-white"
+                        }`}
+                      >
+                        <Plus size={12} /> Ficha #{number}
+                        {name && <span className="font-normal opacity-80">· era de {name.split(" ")[0]}</span>}
+                      </Link>
+                    ))}
+                    {chips.length > 40 && <span className="px-1 py-1.5 text-xs text-slate-500">e mais {chips.length - 40}</span>}
+                    <Link
+                      href={newCustomerHref(info.highest + 1, key)}
+                      className="inline-flex items-center gap-1 rounded-lg border border-dashed border-brand-300 bg-brand-50 px-2.5 py-1.5 text-xs font-bold text-brand-700 transition hover:bg-brand-500 hover:text-white"
+                    >
+                      <Plus size={12} /> Próxima nova: #{info.highest + 1}
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       {!customers || customers.length === 0 ? (
         <div className="card py-12 text-center">
           <ClipboardList className="mx-auto mb-2 text-slate-300" size={30} />
@@ -153,25 +234,7 @@ export default async function FichasPage({ searchParams }: { searchParams: Searc
             const releasedCount = groupCustomers.filter((customer) => isReleased(customer.id)).length;
             const activeCount = groupCustomers.length - releasedCount;
 
-            // Fichas disponíveis para novos clientes neste grupo:
-            // números de clientes que quitaram (e ainda não foram reaproveitados) e números pulados na sequência.
-            const activeNumbers = new Set(
-              groupCustomers
-                .filter((customer) => !isReleased(customer.id) && customer.ficha_number != null)
-                .map((customer) => Number(customer.ficha_number))
-            );
-            const releasedByNumber = new Map<number, string>();
-            groupCustomers
-              .filter((customer) => isReleased(customer.id) && customer.ficha_number != null && !activeNumbers.has(Number(customer.ficha_number)))
-              .forEach((customer) => releasedByNumber.set(Number(customer.ficha_number), customer.name));
-            const releasedNumbers = [...releasedByNumber.entries()].sort((a, b) => a[0] - b[0]);
-            const highest = Math.max(0, ...activeNumbers);
-            const gapNumbers: number[] = [];
-            for (let n = 1; n < highest; n += 1) {
-              if (!activeNumbers.has(n) && !releasedByNumber.has(n)) gapNumbers.push(n);
-            }
-            const availableCount = releasedNumbers.length + gapNumbers.length;
-            const showAvailable = !query && availableCount > 0;
+            const availableCount = availabilityByGroup.get(key)?.count ?? 0;
             const collaborator = key === "sem" ? null : collaboratorMap.get(key);
             return (
               <section key={key} className="card !p-0 overflow-hidden">
@@ -187,56 +250,6 @@ export default async function FichasPage({ searchParams }: { searchParams: Searc
                   </div>
                   {collaborator && <span className="text-[11px] font-semibold text-slate-400">{collaborator.role === "vendedor" ? "Vendedor" : "Cobrador"}</span>}
                 </div>
-
-                {showAvailable && (
-                  <details open className="group border-b border-emerald-100 bg-emerald-50/60 px-4 py-3">
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold text-emerald-800">
-                      <span className="flex items-center gap-2"><CircleCheckBig size={15} /> Fichas disponíveis para novos clientes ({availableCount})</span>
-                      <ChevronDown size={16} className="transition group-open:rotate-180" />
-                    </summary>
-                    <div className="mt-3 space-y-3">
-                      {releasedNumbers.length > 0 && (
-                        <div>
-                          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">Liberadas (cliente quitou)</p>
-                          <div className="flex flex-wrap gap-1.5">
-                            {releasedNumbers.map(([number, name]) => (
-                              <Link
-                                key={number}
-                                href={newCustomerHref(number, key)}
-                                title={`Cadastrar cliente na ficha #${number} (era de ${name})`}
-                                className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-white px-2.5 py-1.5 text-xs font-bold text-emerald-700 shadow-sm transition hover:border-emerald-500 hover:bg-emerald-600 hover:text-white"
-                              >
-                                <Plus size={12} /> Ficha #{number} <span className="font-normal opacity-80">· era de {name.split(" ")[0]}</span>
-                              </Link>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {gapNumbers.length > 0 && (
-                        <div>
-                          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Números sem uso na sequência (até #{highest})</p>
-                          <div className="flex flex-wrap gap-1.5">
-                            {gapNumbers.slice(0, 60).map((number) => (
-                              <Link
-                                key={number}
-                                href={newCustomerHref(number, key)}
-                                title={`Cadastrar cliente na ficha #${number}`}
-                                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-600 shadow-sm transition hover:border-brand-500 hover:bg-brand-500 hover:text-white"
-                              >
-                                <Plus size={12} /> Ficha #{number}
-                              </Link>
-                            ))}
-                            {gapNumbers.length > 60 && <span className="px-1 py-1 text-xs text-slate-500">e mais {gapNumbers.length - 60}</span>}
-                          </div>
-                        </div>
-                      )}
-                      <p className="text-[11px] text-emerald-700">
-                        Toque numa ficha para cadastrar o cliente já com esse número.{" "}
-                        <Link href={newCustomerHref(highest + 1, key)} className="font-semibold underline">Próximo número novo: #{highest + 1}</Link>
-                      </p>
-                    </div>
-                  </details>
-                )}
 
                 <div className="divide-y divide-slate-100">
                   {groupCustomers.map((customer) => {
