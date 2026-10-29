@@ -24,6 +24,13 @@ export type PurchaseItem = {
   quantity: number;
 };
 
+function getDefaultVariantId(products: PurchaseProduct[], variants: PurchaseVariant[]) {
+  const productName = new Map(products.map((product) => [product.id, product.name.toLocaleLowerCase("pt-BR")]));
+  const inStock = variants.filter((variant) => variant.stock_quantity > 0);
+  const match = (text: string) => inStock.find((variant) => (productName.get(variant.product_id) ?? "").includes(text));
+  return (match("rancho completo") ?? match("rancho"))?.id ?? "";
+}
+
 export function PurchaseProductSelector({
   products,
   variants,
@@ -37,7 +44,8 @@ export function PurchaseProductSelector({
   onChange: (items: PurchaseItem[]) => void;
   compact?: boolean;
 }) {
-  const [selectedVariant, setSelectedVariant] = useState("");
+  // Já deixa o "Rancho completo" escolhido (o produto mais vendido); basta tocar no "+".
+  const [selectedVariant, setSelectedVariant] = useState(() => getDefaultVariantId(products, variants));
   const productById = useMemo(() => new Map(products.map((product) => [product.id, product])), [products]);
   const variantById = useMemo(() => new Map(variants.map((variant) => [variant.id, variant])), [variants]);
 
