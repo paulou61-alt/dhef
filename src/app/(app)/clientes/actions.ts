@@ -318,3 +318,33 @@ export async function deleteCustomer(customerId: string): Promise<{ error?: stri
   revalidatePath("/cobrancas");
   redirect("/clientes");
 }
+
+/** Exclui um recebimento lançado por engano. A parcela volta a ficar em aberto. */
+export async function deletePayment(input: { paymentId: string }): Promise<{ error?: string; success?: boolean }> {
+  const access = await getAccessContext();
+  if (!access || access.role !== "owner") return { error: "Apenas o proprietário pode excluir recebimentos." };
+
+  const paymentId = input.paymentId?.trim();
+  if (!paymentId) return { error: "Recebimento inválido." };
+
+  const supabase = createClient();
+  const { error } = await supabase.rpc("delete_payment", { p_payment_id: paymentId });
+
+  if (error) {
+    const message = String(error.message ?? "").toLowerCase();
+    if (message.includes("não encontrado")) return { error: "Recebimento não encontrado." };
+    if (message.includes("function") || message.includes("schema cache")) {
+      return { error: "Falta atualizar o banco: rode o SQL de excluir recebimento no Supabase." };
+    }
+    return { error: "Não foi possível excluir o recebimento." };
+  }
+
+  revalidatePath("/clientes");
+  revalidatePath("/fichas");
+  revalidatePath("/receber");
+  revalidatePath("/cobrancas");
+  revalidatePath("/financeiro");
+  revalidatePath("/relatorios");
+  revalidatePath("/");
+  return { success: true };
+}
