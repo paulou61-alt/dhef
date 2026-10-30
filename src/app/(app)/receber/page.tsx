@@ -82,7 +82,7 @@ export default async function ReceberPage({
     ),
     fetchAll((from, to) => supabase.from("sales").select("id, customer_id, sale_number, is_opening_balance").order("id").range(from, to)),
     fetchAll((from, to) =>
-      supabase.from("customers").select("id, name, phone, whatsapp, ficha_number, assigned_collaborator_id").order("id").range(from, to)
+      supabase.from("customers").select("*").order("id").range(from, to)
     ),
     supabase.from("collaborators").select("id, name, role, is_active").order("name"),
     fetchAll((from, to) => supabase.from("products").select("id, name, sale_price").eq("is_active", true).order("name").order("id").range(from, to)),
@@ -110,6 +110,8 @@ export default async function ReceberPage({
     const item = rawInstallment as DebtInstallment;
     const sale = saleMap.get(item.sale_id);
     const customer = sale?.customer_id ? customerMap.get(sale.customer_id) ?? null : null;
+    // Clientes marcados como prego ou mudou saem da lista de recebimentos.
+    if ((customer as { write_off_status?: string | null } | null)?.write_off_status) continue;
     const key = customer?.id ?? `sem-cliente-${item.sale_id}`;
     const open = Math.max(0, Number(item.amount) - Number(item.paid_amount ?? 0));
 

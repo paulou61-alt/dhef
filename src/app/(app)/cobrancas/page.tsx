@@ -40,7 +40,7 @@ export default async function CobrancasPage({
     fetchAll((from, to) =>
       supabase
         .from("customers")
-        .select("id, ficha_number, name, phone, whatsapp, address, neighborhood, city, state, zip_code, assigned_collaborator_id")
+        .select("*")
         .order("ficha_number")
         .order("id")
         .range(from, to)
@@ -73,6 +73,8 @@ export default async function CobrancasPage({
     if (!sale?.customer_id) return;
     const customer = customerMap.get(sale.customer_id);
     if (!customer) return;
+    // Clientes marcados como prego ou mudou saem das cobranças.
+    if (customer.write_off_status) return;
     if (selectedCollaboratorId && customer.assigned_collaborator_id !== selectedCollaboratorId) return;
     const current = grouped.get(customer.id) ?? { customer, items: [] };
     current.items.push({

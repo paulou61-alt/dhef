@@ -348,3 +348,41 @@ export async function deletePayment(input: { paymentId: string }): Promise<{ err
   revalidatePath("/");
   return { success: true };
 }
+
+/** Marca o cliente como "prego" ou "mudou" (sai das cobranças e libera a ficha) ou reativa (status null). */
+export async function setCustomerWriteOff(input: {
+  customerId: string;
+  status: "prego" | "mudou" | null;
+  note?: string;
+}): Promise<{ error?: string; success?: boolean }> {
+  const access = await getAccessContext();
+  if (!access || access.role !== "owner") return { error: "Apenas o proprietário pode alterar a situação do cliente." };
+  if (input.status !== null && input.status !== "prego" && input.status !== "mudou") return { error: "Situação inválida." };
+
+  const supabase = createClient();
+  const { error } = await supabase.rpc("set_customer_write_off", {
+    p_customer_id: input.customerId,
+    p_status: input.status,
+    p_note: input.note?.trim().slice(0, 240) || null,
+  });
+
+  if (error) {
+    const message = String(error.message ?? "");
+    if (message.includes("já está em uso")) {
+      return { error: "O número da ficha deste cliente já foi usado por outro cliente. Troque o número em \"Editar cliente\" e tente reativar de novo." };
+    }
+    if (/function|schema cache/i.test(message)) {
+      return { error: "Falta atualizar o banco: rode o SQL de cliente prego/mudou no Supabase." };
+    }
+    return { error: "Não foi possível alterar a situação do cliente." };
+  }
+
+  revalidatePath("/fichas");
+  revalidatePath(`/fichas/${input.customerId}`);
+  revalidatePath("/clientes");
+  revalidatePath("/receber");
+  revalidatePath("/cobrancas");
+  revalidatePath("/relatorios");
+  revalidatePath("/");
+  return { success: true };
+}

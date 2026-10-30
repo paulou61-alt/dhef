@@ -54,7 +54,7 @@ export async function getMonthlyBusinessReport(monthValue?: string | null) {
         .order("id")
         .range(from, to)
     ),
-    fetchAll((from, to) => supabase.from("customers").select("id, name, ficha_number, phone, city, state").order("name").order("id").range(from, to)),
+    fetchAll((from, to) => supabase.from("customers").select("*").order("name").order("id").range(from, to)),
     fetchAll((from, to) =>
       supabase
         .from("expenses")
@@ -159,9 +159,11 @@ export async function getMonthlyBusinessReport(monthValue?: string | null) {
         dueDate: installment.due_date,
         openAmount,
         overdue: installment.status === "vencido" || installment.due_date < today,
+        // Prego ou mudou: fora da carteira a receber.
+        writtenOff: Boolean(customer?.write_off_status),
       };
     })
-    .filter((row) => row.openAmount > 0);
+    .filter((row) => row.openAmount > 0 && !row.writtenOff);
 
   const openReceivables = openReceivablesRows.reduce((sum, row) => sum + row.openAmount, 0);
   const overdueReceivables = openReceivablesRows.filter((row) => row.overdue).reduce((sum, row) => sum + row.openAmount, 0);

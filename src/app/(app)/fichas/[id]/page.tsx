@@ -6,6 +6,7 @@ import { getAccessContext } from "@/lib/access";
 import { formatCurrency, formatDate, formatDateTime } from "@/utils/format";
 import { whatsappLink } from "@/utils/masks";
 import { PaymentAmountEditor } from "@/components/customers/PaymentAmountEditor";
+import { CustomerWriteOffControl } from "@/components/customers/CustomerWriteOffControl";
 import { InstallmentDueDateEditor } from "@/components/customers/InstallmentDueDateEditor";
 
 export const dynamic = "force-dynamic";
@@ -96,7 +97,17 @@ export default async function FichaClientePage({ params }: { params: { id: strin
           <div className="rounded-xl bg-surface-muted p-3"><p className="text-xs text-slate-500">Compras</p><p className="mt-1 text-base font-bold text-slate-900">{purchaseSales.length}</p></div>
         </div>
 
-        {totalOpen > 0 && whatsappNumber && <a className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-success px-4 py-3 text-sm font-semibold text-white" target="_blank" rel="noreferrer" href={whatsappLink(whatsappNumber, chargeText)}><MessageCircle size={17} /> Cobrar no WhatsApp</a>}
+        {access?.role === "owner" && (
+          <CustomerWriteOffControl
+            customerId={customer.id}
+            status={(customer.write_off_status as "prego" | "mudou" | null | undefined) ?? null}
+            markedAt={customer.write_off_at ?? null}
+            note={customer.write_off_note ?? null}
+            openAmount={totalOpen}
+          />
+        )}
+
+        {totalOpen > 0 && whatsappNumber && !customer.write_off_status && <a className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-success px-4 py-3 text-sm font-semibold text-white" target="_blank" rel="noreferrer" href={whatsappLink(whatsappNumber, chargeText)}><MessageCircle size={17} /> Cobrar no WhatsApp</a>}
       </div>
 
       <div className="space-y-3">

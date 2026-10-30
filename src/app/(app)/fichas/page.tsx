@@ -38,7 +38,7 @@ export default async function FichasPage({ searchParams }: { searchParams: Searc
   function customerQuery(from: number, to: number) {
     let builder = supabase
       .from("customers")
-      .select("id, name, phone, address, house_number, neighborhood, city, ficha_number, assigned_collaborator_id");
+      .select("*");
 
     if (query) {
       if (/^\d+$/.test(query)) builder = builder.eq("ficha_number", Number(query));
@@ -105,7 +105,10 @@ export default async function FichasPage({ searchParams }: { searchParams: Searc
   // então ela não entra na contagem de fichas ativas.
   const openBalance = (customerId: string) =>
     (salesByCustomer.get(customerId)?.saleIds ?? []).reduce((sum, id) => sum + (installmentBySale.get(id) ?? 0), 0);
-  const isReleased = (customerId: string) => (salesByCustomer.get(customerId)?.saleIds.length ?? 0) > 0 && openBalance(customerId) <= 0;
+  // Prego ou mudou também libera a ficha, mesmo com dívida.
+  const writeOffById = new Map((customers ?? []).filter((customer) => customer.write_off_status).map((customer) => [customer.id, customer.write_off_status as string]));
+  const isReleased = (customerId: string) =>
+    writeOffById.has(customerId) || ((salesByCustomer.get(customerId)?.saleIds.length ?? 0) > 0 && openBalance(customerId) <= 0);
 
   const grouped = new Map<string, typeof customers>();
   // Fichas ativas primeiro; as quitadas vão para o fim de cada grupo.
@@ -268,7 +271,11 @@ export default async function FichasPage({ searchParams }: { searchParams: Searc
                           )}
                           <p className="text-xs text-slate-500">{stats.count} compra(s) · {formatCurrency(stats.total)} comprado</p>
                         </div>
-                        {open > 0 ? (
+                        {writeOffById.has(customer.id) ? (
+                          <span className="rounded-full bg-red-100 px-2 py-1 text-[10px] font-bold text-red-700">
+                            {writeOffById.get(customer.id) === "prego" ? "Prego" : "Mudou"} · ficha liberada
+                          </span>
+                        ) : open > 0 ? (
                           <div className="text-right"><p className="text-xs text-slate-500">Em aberto</p><p className="text-sm font-bold text-warning">{formatCurrency(open)}</p></div>
                         ) : stats.saleIds.length > 0 ? (
                           <span className="rounded-full bg-success/10 px-2 py-1 text-[10px] font-bold text-success">Quitado · ficha liberada</span>
