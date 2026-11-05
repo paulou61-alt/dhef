@@ -6,6 +6,7 @@ import { Banknote, CalendarDays, Check, Eye, HandCoins, Minus, Phone, Plus, Rece
 import { addCollaboratorValeMovement, deleteCollaboratorValeMovement, setCollaboratorValeBalance, updateCollaboratorPermissions, updateCollaboratorValeMovement } from "@/app/(app)/colaboradores/actions";
 import { RemoveCollaboratorButton } from "@/components/collaborators/RemoveCollaboratorButton";
 import { getAllowedViewPermissions, VIEW_PERMISSION_LABELS, type ViewPermission } from "@/lib/permissions";
+import { getValeBalancesByMovement } from "@/lib/vale-balance";
 import { formatCurrency, formatDate, todayInBrazil } from "@/utils/format";
 
 type Role = "vendedor" | "cobrador";
@@ -52,6 +53,7 @@ export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissio
   const [success, setSuccess] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const recentMovements = useMemo(() => valeMovements, [valeMovements]);
+  const movementBalances = useMemo(() => getValeBalancesByMovement(valeMovements), [valeMovements]);
   const allowedPermissions = getAllowedViewPermissions(collaborator.role);
   const permissionsChanged = JSON.stringify([...permissions].sort()) !== JSON.stringify([...viewPermissions].sort());
 
@@ -300,6 +302,7 @@ export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissio
                   const isVale = movement.movement_type === "vale";
                   // Valor zero: acerto registrado sem pagamento (só dá para apagar).
                   const isNote = Number(movement.amount) === 0;
+                  const settlementBalance = movementBalances.get(movement.id) ?? 0;
                   const isEditingMovement = editingMovementId === movement.id;
 
                   return (
@@ -371,23 +374,26 @@ export function CollaboratorProfileCard({ collaborator, hasAccess, viewPermissio
                         </div>
                       ) : (
                         <div className="flex items-center gap-3">
-                          <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${isNote ? "bg-red-100 text-red-600" : isVale ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>
+                          <span className={`flex h-9 w-9 flex-none items-center justify-center rounded-xl ${isNote ? "bg-red-100 text-red-600" : isVale ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>
                             {isNote ? <CalendarDays size={16} /> : isVale ? <Minus size={16} /> : <Plus size={16} />}
                           </span>
                           <div className="min-w-0 flex-1">
                             <p className={`text-sm font-semibold ${isNote ? "text-red-700" : "text-slate-800"}`}>{isNote ? "Acerto sem pagamento" : isVale ? "Vale" : "Saldo"}</p>
-                            <p className={`flex items-center gap-1 text-[11px] ${isNote ? "text-red-600" : "text-slate-500"}`}>
-                              <CalendarDays size={11} />
+                            <p className={`flex flex-wrap items-center gap-1 text-[11px] ${isNote ? "text-red-600" : "text-slate-500"}`}>
+                              <CalendarDays size={11} className="flex-none" />
                               {formatDate(movement.movement_date)}
                               {movement.notes ? ` · ${movement.notes}` : ""}
                             </p>
+                            {isNote && (
+                              <p className={`mt-1 text-sm font-bold ${settlementBalance > 0 ? "text-emerald-700" : "text-red-700"}`}>
+                                {settlementBalance < 0 ? "Ficou devendo" : settlementBalance > 0 ? "Saldo a receber" : "Sem pendência"}: {formatCurrency(Math.abs(settlementBalance))}
+                              </p>
+                            )}
                           </div>
-                          {isNote ? (
-                            <p className="text-sm font-bold text-red-400">—</p>
-                          ) : (
-                          <p className={`text-sm font-bold ${isVale ? "text-amber-700" : "text-emerald-700"}`}>
-                            {isVale ? "-" : "+"} {formatCurrency(Number(movement.amount))}
-                          </p>
+                          {!isNote && (
+                            <p className={`text-sm font-bold ${isVale ? "text-amber-700" : "text-emerald-700"}`}>
+                              {isVale ? "-" : "+"} {formatCurrency(Number(movement.amount))}
+                            </p>
                           )}
                           {!isNote && <button
                             type="button"

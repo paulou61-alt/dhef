@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
 import { CalendarDays, HandCoins, Minus, Plus, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { getAccessContext } from "@/lib/access";
 import { featureGate } from "@/lib/billing/gate";
+import { getValeBalancesByMovement } from "@/lib/vale-balance";
 import { formatCurrency, formatDate, todayInBrazil } from "@/utils/format";
 
 export const dynamic = "force-dynamic";
@@ -25,14 +27,19 @@ export default async function MeuValePage() {
   if (!access.collaboratorId) redirect("/login");
 
   const supabase = createClient();
-  const { data } = await supabase
+  const { data, error } = await fetchAll((from, to) => supabase
     .from("collaborator_vale_movements")
     .select("id, movement_type, amount, movement_date, notes, created_at")
     .eq("collaborator_id", access.collaboratorId)
     .order("movement_date", { ascending: false })
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .order("id")
+    .range(from, to)
+  );
+  if (error) throw new Error("Não foi possível carregar o histórico de vales.");
 
   const allMovements = (data ?? []) as ValeMovement[];
+  const movementBalances = getValeBalancesByMovement(allMovements);
   const signed = (movement: ValeMovement) =>
     movement.movement_type === "vale" ? -Number(movement.amount ?? 0) : Number(movement.amount ?? 0);
 
@@ -126,6 +133,7 @@ export default async function MeuValePage() {
               const isVale = movement.movement_type === "vale";
               // Valor zero: acerto registrado sem pagamento.
               const isNote = Number(movement.amount) === 0;
+              const settlementBalance = movementBalances.get(movement.id) ?? 0;
               return (
                 <div key={movement.id} className={`flex items-center gap-3 px-4 py-3.5 ${isNote ? "border-l-4 border-red-400 bg-red-50" : ""}`}>
                   <span className={`flex h-10 w-10 flex-none items-center justify-center rounded-xl ${isNote ? "bg-red-100 text-red-600" : isVale ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>
@@ -138,10 +146,13 @@ export default async function MeuValePage() {
                       {formatDate(movement.movement_date)}
                       {movement.notes ? ` · ${movement.notes}` : ""}
                     </p>
+                    {isNote && (
+                      <p className={`mt-1 text-sm font-bold ${settlementBalance > 0 ? "text-emerald-700" : "text-red-700"}`}>
+                        {settlementBalance < 0 ? "Ficou devendo" : settlementBalance > 0 ? "Saldo a receber" : "Sem pendência"}: {formatCurrency(Math.abs(settlementBalance))}
+                      </p>
+                    )}
                   </div>
-                  {isNote ? (
-                    <p className="text-sm font-bold text-red-400">—</p>
-                  ) : (
+                  {!isNote && (
                     <p className={`text-sm font-bold ${isVale ? "text-amber-700" : "text-emerald-700"}`}>
                       {isVale ? "-" : "+"} {formatCurrency(Number(movement.amount))}
                     </p>
