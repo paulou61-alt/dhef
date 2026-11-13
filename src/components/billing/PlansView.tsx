@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, Check, CheckCircle2, Clock, CreditCard, Loader2, Minus } from "lucide-react";
-import { ALL_FEATURES, BASE_FEATURES, FEATURE_LABELS, PLANS, lookupKey, type BillingInterval, type PlanId } from "@/lib/billing/plans";
+import { ALL_EXTERNAL_CHECKOUT, ALL_FEATURES, BASE_FEATURES, FEATURE_LABELS, PLANS, checkoutLink, lookupKey, type BillingInterval, type PlanId } from "@/lib/billing/plans";
 import { formatCurrency, formatDate } from "@/utils/format";
 
 type Props = {
@@ -72,7 +72,9 @@ export function PlansView(props: Props) {
     }
   }
 
-  const priceOf = (plan: (typeof PLANS)[number]) => props.prices[lookupKey(plan.id, interval)] ?? plan.fallbackPrice[interval];
+  // Com os links próprios, vale o preço de plans.ts (o mesmo do checkout), não o do Stripe.
+  const priceOf = (plan: (typeof PLANS)[number]) =>
+    checkoutLink(plan.id, interval) ? plan.fallbackPrice[interval] : props.prices[lookupKey(plan.id, interval)] ?? plan.fallbackPrice[interval];
 
   return (
     <div className="space-y-6">
@@ -178,6 +180,7 @@ export function PlansView(props: Props) {
             ))}
           </div>
 
+          {!ALL_EXTERNAL_CHECKOUT && (
           <div className="mx-auto max-w-md text-center">
             <div className="mx-auto flex w-fit rounded-2xl bg-slate-100 p-1.5">
               {([["cartao", "Cartão de crédito"], ["pix", "Pix"]] as const).map(([option, label]) => (
@@ -197,11 +200,13 @@ export function PlansView(props: Props) {
                 : "Cobrança automática no cartão. Cancele quando quiser."}
             </p>
           </div>
+          )}
 
           <div className="grid gap-4 md:grid-cols-3">
             {PLANS.map((plan) => {
               const price = priceOf(plan);
               const key = `checkout-${plan.id}`;
+              const externalLink = checkoutLink(plan.id, interval);
               return (
                 <div
                   key={plan.id}
@@ -238,15 +243,26 @@ export function PlansView(props: Props) {
                       );
                     })}
                   </ul>
-                  <button
-                    type="button"
-                    onClick={() => go(key, method === "pix" ? "/api/stripe/pix" : "/api/stripe/checkout", { plan: plan.id, interval })}
-                    disabled={loading !== null}
-                    className={`mt-5 inline-flex w-full items-center justify-center gap-2 ${plan.highlight ? "btn-primary" : "btn-secondary"}`}
-                  >
-                    {loading === key && <Loader2 size={16} className="animate-spin" />}
-                    Assinar {plan.name}{method === "pix" ? " com Pix" : ""}
-                  </button>
+                  {externalLink ? (
+                    <a
+                      href={externalLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`mt-5 inline-flex w-full items-center justify-center gap-2 ${plan.highlight ? "btn-primary" : "btn-secondary"}`}
+                    >
+                      Assinar {plan.name}
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => go(key, method === "pix" ? "/api/stripe/pix" : "/api/stripe/checkout", { plan: plan.id, interval })}
+                      disabled={loading !== null}
+                      className={`mt-5 inline-flex w-full items-center justify-center gap-2 ${plan.highlight ? "btn-primary" : "btn-secondary"}`}
+                    >
+                      {loading === key && <Loader2 size={16} className="animate-spin" />}
+                      Assinar {plan.name}{method === "pix" ? " com Pix" : ""}
+                    </button>
+                  )}
                 </div>
               );
             })}
@@ -266,7 +282,7 @@ export function PlansView(props: Props) {
       {error && <p className="mx-auto max-w-md rounded-xl bg-danger/10 px-4 py-3 text-center text-sm text-danger">{error}</p>}
 
       <p className="text-center text-xs text-slate-400">
-        Pagamento seguro processado pelo Stripe, no cartão ou no Pix. Cancele quando quiser. Mais de 30 colaboradores? Fale com a gente.
+        {ALL_EXTERNAL_CHECKOUT ? "Pagamento seguro, no cartão ou no Pix." : "Pagamento seguro processado pelo Stripe, no cartão ou no Pix."} Cancele quando quiser. Mais de 30 colaboradores? Fale com a gente.
       </p>
     </div>
   );

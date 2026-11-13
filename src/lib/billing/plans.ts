@@ -41,7 +41,7 @@ export const PLANS: Plan[] = [
     collaboratorLimit: 3,
     description: "O essencial para vender no crediário e cobrar em dia.",
     features: [],
-    fallbackPrice: { mensal: 79, anual: 790 },
+    fallbackPrice: { mensal: 79.9, anual: 790 },
   },
   {
     id: "profissional",
@@ -63,6 +63,26 @@ export const PLANS: Plan[] = [
 ];
 
 export const TRIAL_COLLABORATOR_LIMIT = 10;
+
+/**
+ * Links de pagamento próprios (Kiwify, Hotmart, Mercado Pago etc.).
+ * Cole o link de cada plano entre as aspas. Botão com link preenchido abre esse link;
+ * botão com link vazio continua usando o pagamento do Stripe.
+ * Atenção: pagamento feito por link de fora não libera o plano sozinho no sistema.
+ */
+export const CHECKOUT_LINKS: Record<PlanId, Record<BillingInterval, string>> = {
+  essencial: { mensal: "https://pay.kiwify.com.br/h1VlPqK", anual: "https://pay.kiwify.com.br/B1iRTk1" },
+  profissional: { mensal: "https://pay.kiwify.com.br/xdc8oFG", anual: "https://pay.kiwify.com.br/tgKZozV" },
+  equipe: { mensal: "https://pay.kiwify.com.br/RzeBESf", anual: "https://pay.kiwify.com.br/mJUsxU9" },
+};
+
+export function checkoutLink(plan: PlanId, interval: BillingInterval): string | null {
+  const link = CHECKOUT_LINKS[plan]?.[interval]?.trim();
+  return link ? link : null;
+}
+
+/** Verdadeiro quando todos os planos já têm link próprio (some a escolha cartão/Pix do Stripe). */
+export const ALL_EXTERNAL_CHECKOUT = PLANS.every((plan) => checkoutLink(plan.id, "mensal") && checkoutLink(plan.id, "anual"));
 
 export function lookupKey(plan: PlanId, interval: BillingInterval) {
   return `cobrei_${plan}_${interval}`;
