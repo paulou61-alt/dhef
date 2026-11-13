@@ -1,3 +1,4 @@
+import { saleDirectPayment } from "@/lib/customer-discounts";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft, UserRound } from "lucide-react";
@@ -28,8 +29,10 @@ export default async function SaleDetailPage({ params }: { params: { id: string 
   ]);
 
   const paidInstallments = (installments ?? []).reduce((sum, item) => sum + Number(item.paid_amount), 0);
-  const paidTotal = sale.is_paid ? Number(sale.total) : Number(sale.down_payment) + paidInstallments;
-  const openTotal = Math.max(0, Number(sale.total) - paidTotal);
+  const hasInstallments = (installments ?? []).length > 0;
+  const paidTotal = saleDirectPayment(sale, new Set(hasInstallments ? [sale.id] : [])) + paidInstallments;
+  const openTotal = hasInstallments ? (installments ?? []).reduce((sum, item) => sum + Math.max(0, Number(item.amount) - Number(item.paid_amount)), 0) : Math.max(0, Number(sale.total) - paidTotal);
+  const discountTotal = hasInstallments ? Math.max(0, Math.round((Number(sale.total) - paidTotal - openTotal) * 100) / 100) : 0;
 
   return (
     <div className="space-y-4">
@@ -45,9 +48,11 @@ export default async function SaleDetailPage({ params }: { params: { id: string 
             <p className="mt-1 text-sm text-slate-500">{formatDateTime(sale.created_at)} · {PAYMENT_LABELS[sale.payment_method] ?? sale.payment_method}</p>
           </div>
           <span className={`rounded-full px-3 py-1 text-xs font-semibold ${openTotal > 0 ? "bg-warning/10 text-warning" : "bg-success/10 text-success"}`}>
-            {openTotal > 0 ? `${formatCurrency(openTotal)} em aberto` : "Pago"}
+            {openTotal > 0 ? `${formatCurrency(openTotal)} em aberto` : "Quitado"}
           </span>
         </div>
+
+        {discountTotal > 0 && <p className="mt-3 text-sm text-brand-700">Descontos na dívida: {formatCurrency(discountTotal)} · Recebido: {formatCurrency(paidTotal)}</p>}
 
         {customer && (
           <Link href={`/fichas/${customer.id}`} className="mt-4 flex items-center gap-3 rounded-xl bg-surface-muted p-3">
@@ -89,7 +94,7 @@ export default async function SaleDetailPage({ params }: { params: { id: string 
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-bold text-slate-900">{formatCurrency(Number(item.amount))}</p>
-                    <p className={`text-xs font-medium ${open > 0 ? "text-warning" : "text-success"}`}>{open > 0 ? `${formatCurrency(open)} aberto` : "Pago"}</p>
+                    <p className={`text-xs font-medium ${open > 0 ? "text-warning" : "text-success"}`}>{open > 0 ? `${formatCurrency(open)} aberto` : "Quitado"}</p>
                   </div>
                 </li>
               );

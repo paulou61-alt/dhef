@@ -1,3 +1,5 @@
+import { CustomerDiscounts } from "@/components/customers/CustomerDiscounts";
+import { saleDirectPayment } from "@/lib/customer-discounts";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ChevronLeft, MapPin, Phone, MessageCircle, UserRound } from "lucide-react";
@@ -40,6 +42,11 @@ export default async function FichaClientePage({ params }: { params: { id: strin
     ? await supabase.from("payments").select("*").in("installment_id", installmentIds).order("payment_date", { ascending: false })
     : { data: [] as any[] };
 
+  const { data: discounts, error: discountsError } = await supabase.from("customer_discounts")
+    .select("id, amount, note, created_at, reversed_at").eq("customer_id", params.id)
+    .order("created_at", { ascending: false });
+  const installmentSaleIds = new Set<string>((installments ?? []).map((item) => item.sale_id));
+
   const itemsBySale = new Map<string, any[]>();
   (items ?? []).forEach((item) => itemsBySale.set(item.sale_id, [...(itemsBySale.get(item.sale_id) ?? []), item]));
   const installmentsBySale = new Map<string, any[]>();
@@ -53,7 +60,7 @@ export default async function FichaClientePage({ params }: { params: { id: strin
   const pendingInstallments = (installments ?? []).filter((i) => i.status !== "pago" && Number(i.amount) - Number(i.paid_amount) > 0);
   const totalOpen = pendingInstallments.reduce((sum, i) => sum + Number(i.amount) - Number(i.paid_amount), 0);
   const totalReceivedFromInstallments = (payments ?? []).reduce((sum, p) => sum + Number(p.amount), 0);
-  const directPaid = purchaseSales.reduce((sum, sale) => sum + (sale.is_paid ? Number(sale.total) : Number(sale.down_payment)), 0);
+  const directPaid = purchaseSales.reduce((sum, sale) => sum + saleDirectPayment(sale, installmentSaleIds), 0);
   const totalPaid = directPaid + totalReceivedFromInstallments;
 
   const whatsappNumber = customer.whatsapp ?? customer.phone;
@@ -109,6 +116,8 @@ export default async function FichaClientePage({ params }: { params: { id: strin
 
         {totalOpen > 0 && whatsappNumber && !customer.write_off_status && <a className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-success px-4 py-3 text-sm font-semibold text-white" target="_blank" rel="noreferrer" href={whatsappLink(whatsappNumber, chargeText)}><MessageCircle size={17} /> Cobrar no WhatsApp</a>}
       </div>
+
+      <CustomerDiscounts customerId={customer.id} openAmount={totalOpen} discounts={discounts ?? []} canManage={access?.role === "owner"} loadError={Boolean(discountsError)} />
 
       <div className="space-y-3">
         <h2 className="text-base font-bold text-slate-900">Histórico completo da ficha</h2>

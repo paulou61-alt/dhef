@@ -1,5 +1,7 @@
 "use server";
 
+import { validateDiscountAmount } from "@/lib/customer-discounts";
+
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -385,4 +387,57 @@ export async function setCustomerWriteOff(input: {
   revalidatePath("/relatorios");
   revalidatePath("/");
   return { success: true };
+}
+
+
+/** Abate a dívida sem registrar entrada de dinheiro. A operação é atômica no banco. */
+export async function applyCustomerDiscount(input: {
+  customerId: string; amount: number; note?: string; requestId: string;
+}): Promise<{ error?: string; success?: boolean }> {
+  const access = await getAccessContext();
+  if (!access || access.role !== "owner") return { error: "Apenas o proprietário pode conceder descontos." };
+  const validation = validateDiscountAmount(input.amount);
+  if (validation) return { error: validation };
+  if (!isDiscountUuid(input.customerId) || !isDiscountUuid(input.requestId)) return { error: "Desconto inválido. Atualize a página." };
+  const supabase = createClient();
+  const { error } = await supabase.rpc("apply_customer_discount", {
+    p_customer_id: input.customerId, p_amount: input.amount,
+    p_note: input.note?.trim().slice(0, 240) || null, p_request_id: input.requestId,
+  });
+  if (error) return { error: discountError(error.message) };
+  refreshDiscountPaths(input.customerId);
+  return { success: true };
+}
+
+export async function reverseCustomerDiscount(input: {
+  customerId: string; discountId: string;
+}): Promise<{ error?: string; success?: boolean }> {
+  const access = await getAccessContext();
+  if (!access || access.role !== "owner") return { error: "Apenas o proprietário pode estornar descontos." };
+  if (!isDiscountUuid(input.customerId) || !isDiscountUuid(input.discountId)) return { error: "Desconto inválido." };
+  const supabase = createClient();
+  const { error } = await supabase.rpc("reverse_customer_discount", {
+    p_customer_id: input.customerId, p_discount_id: input.discountId,
+  });
+  if (error) return { error: discountError(error.message) };
+  refreshDiscountPaths(input.customerId);
+  return { success: true };
+}
+
+function isDiscountUuid(value: string): boolean {
+  return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+}
+
+function discountError(message: string): string {
+  if (/saldo|Cliente não encontrado|Desconto não encontrado|duas casas|maior que zero|lançamento|já está em uso|parcelas foram alteradas/i.test(message)) return message;
+  if (/function|schema cache/i.test(message)) return "O recurso de descontos está indisponível. Atualize a página e tente novamente.";
+  if (/deadlock|serialize/i.test(message)) return "O saldo foi atualizado por outro lançamento. Tente novamente.";
+  return "Não foi possível salvar o desconto. Tente novamente.";
+}
+
+function refreshDiscountPaths(customerId: string) {
+  for (const path of ["/", "/clientes", `/clientes/${customerId}`, "/fichas", `/fichas/${customerId}`, "/receber", "/cobrancas", "/financeiro", "/relatorios", "/vender"]) {
+    revalidatePath(path);
+  }
+  revalidatePath("/vender/[id]", "page");
 }

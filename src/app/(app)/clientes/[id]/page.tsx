@@ -1,3 +1,5 @@
+import { CustomerDiscounts } from "@/components/customers/CustomerDiscounts";
+import { saleDirectPayment } from "@/lib/customer-discounts";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft, MessageCircle, Pencil, MapPin, Plus, CheckCircle2 } from "lucide-react";
@@ -49,6 +51,11 @@ export default async function CustomerDetailPage({ params, searchParams }: { par
         .order("due_date", { ascending: true })
     : { data: [] as any[] };
 
+  const { data: discounts, error: discountsError } = await supabase.from("customer_discounts")
+    .select("id, amount, note, created_at, reversed_at").eq("customer_id", params.id)
+    .order("created_at", { ascending: false });
+  const installmentSaleIds = new Set<string>((installments ?? []).map((item) => item.sale_id));
+
   const actualSales = (sales ?? []).filter((sale) => !sale.is_opening_balance);
   const completedPurchases = actualSales.filter((sale) => sale.status === "completed");
 
@@ -60,7 +67,7 @@ export default async function CustomerDetailPage({ params, searchParams }: { par
 
   const installmentPaid = (installments ?? []).reduce((sum, installment) => sum + Number(installment.paid_amount), 0);
   const directPaid = completedPurchases.reduce(
-    (sum, sale) => sum + (sale.is_paid ? Number(sale.total) : Number(sale.down_payment ?? 0)),
+    (sum, sale) => sum + saleDirectPayment(sale, installmentSaleIds),
     0,
   );
   const totalPaid = directPaid + installmentPaid;
@@ -144,6 +151,8 @@ export default async function CustomerDetailPage({ params, searchParams }: { par
           </div>
         </div>
       )}
+
+      <CustomerDiscounts customerId={customer.id} openAmount={totalOpen} discounts={discounts ?? []} canManage={access?.role === "owner"} loadError={Boolean(discountsError)} />
 
       {pendingInstallments.length > 0 && (
         <div className="card">
