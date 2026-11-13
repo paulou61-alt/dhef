@@ -351,6 +351,7 @@ export default async function ReceberPage({
                               products={(products ?? []) as any}
                               variants={(variants ?? []) as any}
                               successHref={successHrefFor(debtor.key)}
+                              allowDiscount={access?.role === "owner"}
                               collectors={collectors}
                               defaultCollectorId={debtor.customer?.assigned_collaborator_id ?? ""}
                             />

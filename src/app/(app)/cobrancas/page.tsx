@@ -237,6 +237,7 @@ export default async function CobrancasPage({
                         buttonLabel={item.isOpeningBalance ? "Receber saldo" : `Pagar ${item.installment_number}/${item.total_installments}`}
                         products={(products ?? []) as any}
                         variants={(variants ?? []) as any}
+                        allowDiscount={access?.role === "owner"}
                         collectors={collectors}
                         defaultCollectorId={customer.assigned_collaborator_id ?? ""}
                       />

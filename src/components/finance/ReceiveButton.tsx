@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { CloudOff, ShoppingBag } from "lucide-react";
+import { useId, useState } from "react";
+import { BadgeMinus, CloudOff, ShoppingBag } from "lucide-react";
+import { parseDiscountAmount } from "@/lib/customer-discounts";
+import { receiptBalance, suggestedReceiptAmount, validateReceiptAmounts } from "@/lib/receipt-discounts";
 import { submitOfflineCapableOperation } from "@/lib/offline/sync";
 import { formatCurrency, todayInBrazil } from "@/utils/format";
 import { SelectField } from "@/components/ui/SelectField";
@@ -35,6 +37,7 @@ export function ReceiveButton({
   successHref,
   collectors = [],
   defaultCollectorId = "",
+  allowDiscount = false,
 }: {
   installmentId: string;
   openAmount: number;
@@ -47,7 +50,12 @@ export function ReceiveButton({
   collectors?: { id: string; name: string }[];
   /** Cobrador já marcado ao abrir (ex.: o responsável pela ficha do cliente). */
   defaultCollectorId?: string;
+  /** Apenas o proprietário pode conceder descontos. */
+  allowDiscount?: boolean;
 }) {
+  const fieldId = useId();
+  const [discount, setDiscount] = useState("");
+  const [discountNote, setDiscountNote] = useState("");
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState(String(openAmount.toFixed(2)).replace(".", ","));
   const [method, setMethod] = useState<"pix" | "dinheiro" | "cartao">("pix");
@@ -64,10 +72,13 @@ export function ReceiveButton({
   const [purchaseNotes, setPurchaseNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  const [pending, setPending] = useState(false);
 
-  const parsedAmount = Number(amount.replace(",", "."));
-  const excessAmount = Number.isFinite(parsedAmount) ? Math.round((parsedAmount - openAmount) * 100) / 100 : 0;
+  const parsedAmount = parseDiscountAmount(amount);
+  const parsedDiscount = allowDiscount && discount.trim() ? parseDiscountAmount(discount) : 0;
+  const validAmounts = Number.isFinite(parsedAmount) && Number.isFinite(parsedDiscount);
+  const balance = receiptBalance(openAmount, parsedAmount || 0, parsedDiscount || 0);
+  const excessAmount = validAmounts ? Math.round((parsedAmount + parsedDiscount - openAmount) * 100) / 100 : 0;
   // Pagou diferente do saldo da parcela: dá para escolher o vencimento do que ficou em aberto.
   const canReschedule = Number.isFinite(parsedAmount) && parsedAmount > 0 && excessAmount !== 0;
 
@@ -82,89 +93,125 @@ export function ReceiveButton({
     setPurchaseNotes("");
   }
 
-  function submit() {
+  async function submit() {
+    if (pending) return;
     setError(null);
     setNotice(null);
-    startTransition(async () => {
-      try {
-        const hasPurchase = purchaseItems.length > 0;
-        const payload: Record<string, unknown> = {
-          installmentId,
-          amount: Number(amount.replace(",", ".")),
-          paymentMethod: method,
-          paymentDate: date,
-          notes,
-        };
-        if (canReschedule && nextDueDate) payload.nextDueDate = nextDueDate;
-        if (collectorId) payload.collectorId = collectorId;
-
-        if (hasPurchase) {
-          payload.items = purchaseItems.map((item) => ({
-            product_variant_id: item.variantId,
-            quantity: item.quantity,
-          }));
-          payload.purchasePaymentMethod = purchasePaymentMethod;
-          payload.purchaseDownPayment = Number(purchaseDownPayment.replace(",", ".")) || 0;
-          payload.purchaseInstallmentsCount = Number(purchaseInstallments) || 1;
-          payload.purchaseFirstDueDate = purchaseFirstDueDate;
-          payload.purchaseNotes = purchaseNotes;
-        }
-
-        const result = await submitOfflineCapableOperation(hasPurchase ? "payment_purchase" : "payment", payload);
-
-        if (result.synced) {
-          setOpen(false);
-          resetPurchase();
-          if (result.warning) window.alert(result.warning);
-          if (successHref) window.location.href = successHref;
-          else window.location.reload();
-          return;
-        }
-
-        if (result.queued) {
-          setOpen(false);
-          resetPurchase();
-          setNotice(result.error
-            ? `Operação salva no aparelho, mas precisa de atenção: ${result.error}`
-            : hasPurchase
-              ? "Recebimento e nova compra salvos offline. Serão sincronizados juntos quando a internet voltar."
-              : "Recebimento salvo offline. Será sincronizado automaticamente quando a internet voltar.");
-          return;
-        }
-
-        setError(result.error ?? "Não foi possível registrar o recebimento.");
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Não foi possível salvar o recebimento offline.");
+    const validation = validateReceiptAmounts(openAmount, parsedAmount, parsedDiscount);
+    if (validation) return setError(validation);
+    setPending(true);
+    try {
+      const hasPurchase = purchaseItems.length > 0;
+      const payload: Record<string, unknown> = {
+        installmentId,
+        amount: parsedAmount,
+        paymentMethod: method,
+        paymentDate: date,
+        notes,
+      };
+      if (parsedDiscount > 0) {
+        payload.discountAmount = parsedDiscount;
+        payload.discountNote = discountNote.trim();
       }
-    });
+      if (canReschedule && nextDueDate) payload.nextDueDate = nextDueDate;
+      if (collectorId) payload.collectorId = collectorId;
+
+      if (hasPurchase) {
+        payload.items = purchaseItems.map((item) => ({
+          product_variant_id: item.variantId,
+          quantity: item.quantity,
+        }));
+        payload.purchasePaymentMethod = purchasePaymentMethod;
+        payload.purchaseDownPayment = Number(purchaseDownPayment.replace(",", ".")) || 0;
+        payload.purchaseInstallmentsCount = Number(purchaseInstallments) || 1;
+        payload.purchaseFirstDueDate = purchaseFirstDueDate;
+        payload.purchaseNotes = purchaseNotes;
+      }
+
+      const result = await submitOfflineCapableOperation(hasPurchase ? "payment_purchase" : "payment", payload);
+
+      if (result.synced) {
+        setOpen(false);
+        resetPurchase();
+        if (result.warning) window.alert(result.warning);
+        if (successHref) window.location.href = successHref;
+        else window.location.reload();
+        return;
+      }
+
+      if (result.queued) {
+        setOpen(false);
+        resetPurchase();
+        setNotice(result.error
+          ? `Operação salva no aparelho, mas precisa de atenção: ${result.error}`
+          : hasPurchase
+            ? "Recebimento e nova compra salvos offline. Serão sincronizados juntos quando a internet voltar."
+            : "Recebimento salvo offline. Será sincronizado automaticamente quando a internet voltar.");
+        return;
+      }
+
+      setError(result.error ?? "Não foi possível registrar o recebimento.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível salvar o recebimento offline.");
+    } finally {
+      setPending(false);
+    }
   }
 
   return (
     <>
       <div className="flex flex-col items-end gap-1.5">
-        <button type="button" onClick={() => setOpen(true)} className="rounded-xl bg-brand-500 px-3 py-2 text-xs font-semibold text-white">{buttonLabel}</button>
+        <button type="button" onClick={() => { setAmount(openAmount.toFixed(2).replace(".", ",")); setDiscount(""); setDiscountNote(""); setError(null); setOpen(true); }} className="rounded-xl bg-brand-500 px-3 py-2 text-xs font-semibold text-white">{buttonLabel}</button>
         {notice && <span className="max-w-[240px] rounded-lg bg-amber-50 px-2 py-1 text-right text-[10px] font-medium text-amber-800"><CloudOff size={11} className="mr-1 inline" />{notice}</span>}
       </div>
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-0 sm:items-center sm:p-4">
-          <div className="max-h-[92dvh] w-full max-w-xl overflow-y-auto rounded-t-2xl bg-white p-5 shadow-floating sm:rounded-2xl">
+          <div role="dialog" aria-modal="true" aria-labelledby={`${fieldId}-title`} className="max-h-[92dvh] w-full max-w-xl overflow-y-auto rounded-t-2xl bg-white p-5 shadow-floating sm:rounded-2xl">
             <div className="mb-4">
-              <h2 className="text-lg font-bold text-slate-900">Registrar recebimento</h2>
+              <h2 id={`${fieldId}-title`} className="text-lg font-bold text-slate-900">Registrar recebimento</h2>
               <p className="text-sm text-slate-500">Saldo atual: {formatCurrency(openAmount)}</p>
             </div>
 
-            <div className="space-y-4">
+            <fieldset disabled={pending} className="min-w-0 space-y-4">
               <section className="space-y-3">
                 <div>
-                  <label className="label">Valor recebido</label>
-                  <input className="input-field" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
+                  <label htmlFor={`${fieldId}-amount`} className="label">Valor recebido</label>
+                  <input id={`${fieldId}-amount`} className="input-field" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
                   {excessAmount > 0 && (
                     <p className="mt-1.5 rounded-lg bg-brand-50 px-2.5 py-1.5 text-xs text-brand-700">
                       {formatCurrency(excessAmount)} a mais que esta parcela. A diferença será abatida automaticamente nas próximas parcelas do cliente.
                     </p>
                   )}
                 </div>
+                {allowDiscount && (
+                  <div className="space-y-3 rounded-xl border border-brand-100 bg-brand-50/40 p-3">
+                    <div>
+                      <label htmlFor={`${fieldId}-discount`} className="label flex items-center gap-1.5"><BadgeMinus size={15} /> Desconto (R$) — opcional</label>
+                      <input id={`${fieldId}-discount`} className="input-field bg-white" inputMode="decimal" placeholder="0,00" value={discount} onChange={(event) => {
+                        const next = event.target.value;
+                        const nextValue = next.trim() ? parseDiscountAmount(next) : 0;
+                        if (Number.isFinite(nextValue) && nextValue >= 0 && nextValue <= openAmount && Number.isFinite(parsedAmount)) {
+                          const suggested = suggestedReceiptAmount(openAmount, parsedAmount, Number.isFinite(parsedDiscount) ? parsedDiscount : 0, nextValue);
+                          if (suggested !== parsedAmount) setAmount(suggested.toFixed(2).replace(".", ","));
+                        }
+                        setDiscount(next); setError(null);
+                      }} />
+                      <p className="mt-1 text-[11px] text-slate-500">Abate a dívida desta parcela e fica no histórico da ficha. Não entra no caixa.</p>
+                    </div>
+                    {parsedDiscount > 0 && <>
+                      <div>
+                        <label htmlFor={`${fieldId}-discount-note`} className="label">Motivo do desconto (opcional)</label>
+                        <input id={`${fieldId}-discount-note`} className="input-field bg-white" maxLength={240} value={discountNote} onChange={(event) => setDiscountNote(event.target.value)} placeholder="Ex.: acordo para quitação" />
+                      </div>
+                      {validAmounts && <dl aria-live="polite" className="space-y-1 text-sm">
+                        <div className="flex justify-between gap-2"><dt>Dinheiro recebido</dt><dd className="font-semibold">{formatCurrency(parsedAmount)}</dd></div>
+                        <div className="flex justify-between gap-2"><dt>Desconto concedido</dt><dd className="font-semibold">{formatCurrency(parsedDiscount)}</dd></div>
+                        <div className="flex justify-between gap-2 border-t border-brand-100 pt-1"><dt>Saldo restante desta parcela</dt><dd className="font-bold text-brand-700">{formatCurrency(balance.remaining)}</dd></div>
+                      </dl>}
+                    </>}
+                  </div>
+                )}
                 {canReschedule && (
                   <div>
                     <label className="label">{excessAmount < 0 ? "Vencimento do restante" : "Vencimento da próxima parcela"}</label>
@@ -260,13 +307,13 @@ export function ReceiveButton({
                 )}
               </section>
 
-              {error && <p className="rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
+              {error && <p role="alert" className="rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
 
               <div className="grid grid-cols-2 gap-2 pt-1">
                 <button type="button" onClick={() => setOpen(false)} className="btn-secondary">Cancelar</button>
                 <button type="button" disabled={pending} onClick={submit} className="btn-primary">{pending ? "Salvando..." : purchaseItems.length > 0 ? "Receber + vender" : "Confirmar"}</button>
               </div>
-            </div>
+            </fieldset>
           </div>
         </div>
       )}
