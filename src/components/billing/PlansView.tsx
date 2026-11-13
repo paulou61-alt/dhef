@@ -17,7 +17,23 @@ type Props = {
   blocked: boolean;
   success: boolean;
   prices: Record<string, number>;
+  ownerId: string;
+  email: string | null;
+  name: string | null;
 };
+
+/** Link da Kiwify com o código da conta (sck) e o e-mail já preenchido. */
+function withBuyer(link: string, props: Pick<Props, "ownerId" | "email" | "name">) {
+  try {
+    const url = new URL(link);
+    url.searchParams.set("sck", props.ownerId);
+    if (props.email) url.searchParams.set("email", props.email);
+    if (props.name && props.name !== props.email) url.searchParams.set("name", props.name);
+    return url.toString();
+  } catch {
+    return link;
+  }
+}
 
 
 const SUBSCRIBED_STATUSES = new Set(["active", "trialing", "past_due"]);
@@ -41,7 +57,9 @@ export function PlansView(props: Props) {
   const subscribed = props.status ? SUBSCRIBED_STATUSES.has(props.status) : false;
   // Plano pré-pago no Pix ainda dentro da validade.
   const pixActive = props.status === "pix" && !props.blocked;
-  const hasPlan = subscribed || pixActive;
+  // Plano pago pela Kiwify ainda dentro da validade.
+  const kiwifyActive = props.status === "kiwify" && !props.blocked;
+  const hasPlan = subscribed || pixActive || kiwifyActive;
   const router = useRouter();
   const [confirmationTimedOut, setConfirmationTimedOut] = useState(false);
   const waitingConfirmation = props.success && !hasPlan && !confirmationTimedOut;
@@ -88,7 +106,7 @@ export function PlansView(props: Props) {
           {hasPlan
             ? "Pagamento confirmado! Seu plano está ativo."
             : waitingConfirmation
-              ? "Pagamento recebido! Confirmando com o Stripe (no Pix pode levar até 1 minuto)..."
+              ? "Pagamento recebido! Confirmando o pagamento (no Pix pode levar até 1 minuto)..."
               : "Pagamento recebido, mas a confirmação ainda não chegou. Atualize a página em alguns minutos; se continuar assim, fale com o suporte."}
         </StatusBox>
       )}
@@ -96,6 +114,8 @@ export function PlansView(props: Props) {
         <StatusBox tone="danger" icon={<AlertTriangle size={20} />}>
           {props.status === "trial"
             ? "Seu teste grátis terminou. Escolha um plano para continuar usando o Cobrei. Seus dados estão guardados."
+            : props.status === "kiwify"
+              ? "Seu plano venceu ou o pagamento não foi confirmado. Assine de novo para continuar usando o Cobrei. Seus dados estão guardados."
             : props.status === "pix"
               ? "Seu plano pago no Pix venceu. Renove para continuar usando o Cobrei. Seus dados estão guardados."
             : "Sua assinatura não está ativa. Escolha um plano ou atualize o pagamento para voltar a usar o Cobrei. Seus dados estão guardados."}
@@ -139,6 +159,23 @@ export function PlansView(props: Props) {
             {loading === "portal" ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}
             Gerenciar assinatura
           </button>
+        </div>
+      )}
+
+      {kiwifyActive && (
+        <div className="card">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Seu plano</p>
+          <p className="mt-1 text-lg font-bold text-slate-900">
+            {PLANS.find((plan) => plan.id === props.currentPlan)?.name ?? "Plano ativo"}
+            {props.currentInterval ? <span className="text-sm font-medium text-slate-500"> · {props.currentInterval}</span> : null}
+          </p>
+          {props.periodEnd && (
+            <p className="mt-0.5 text-xs text-slate-500">
+              {props.cancelAtPeriodEnd ? "Assinatura cancelada. Acesso até " : "Acesso garantido até "}
+              {formatDate(props.periodEnd)}
+              {props.cancelAtPeriodEnd ? "." : ". A renovação é automática pela Kiwify."}
+            </p>
+          )}
         </div>
       )}
 
@@ -245,7 +282,7 @@ export function PlansView(props: Props) {
                   </ul>
                   {externalLink ? (
                     <a
-                      href={externalLink}
+                      href={withBuyer(externalLink, props)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className={`mt-5 inline-flex w-full items-center justify-center gap-2 ${plan.highlight ? "btn-primary" : "btn-secondary"}`}

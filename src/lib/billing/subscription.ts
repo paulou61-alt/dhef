@@ -46,7 +46,8 @@ export function hasAccess(subscription: Subscription | null) {
     return Boolean(subscription.trial_ends_at && new Date(subscription.trial_ends_at).getTime() > Date.now());
   }
   // Plano pré-pago no Pix: vale até a data paga.
-  if (subscription.status === "pix") {
+  // Plano pago no Pix ou pela Kiwify: vale até a data paga.
+  if (subscription.status === "pix" || subscription.status === "kiwify") {
     return Boolean(subscription.current_period_end && new Date(subscription.current_period_end).getTime() > Date.now());
   }
   return ACTIVE_STRIPE_STATUSES.has(subscription.status);
@@ -108,6 +109,16 @@ export function planSummary(subscription: Subscription | null): { label: string;
         label: `Plano ${name ?? "ativo"} · Pix`,
         hint: days <= 5 ? `${days === 1 ? "Vence em 1 dia" : `Vence em ${days} dias`} · Renovar` : `Pago até ${date(subscription.current_period_end)}`,
         tone: days <= 5 ? "warning" : "brand",
+      };
+    }
+    case "kiwify": {
+      const end = date(subscription.current_period_end);
+      const expired = !hasAccess(subscription);
+      if (expired) return { label: "Plano vencido", hint: "Assinar de novo", tone: "warning" };
+      return {
+        label: `Plano ${name ?? "ativo"}`,
+        hint: end ? (subscription.cancel_at_period_end ? `Cancelado · acesso até ${end}` : `Pago até ${end}`) : null,
+        tone: subscription.cancel_at_period_end ? "warning" : "brand",
       };
     }
     case "active":

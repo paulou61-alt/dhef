@@ -4,7 +4,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "@/lib/supabase/config";
 import { firstAllowedPath, normalizeViewPermissions, permissionForPath } from "@/lib/permissions";
 
 // O webhook do Stripe chega sem login; a autenticidade é conferida pela assinatura do Stripe.
-const PUBLIC_ROUTES = ["/inicio", "/login","/cadastro", "/colaborador/login", "/recuperar-senha", "/redefinir-senha", "/offline", "/api/stripe/webhook"];
+const PUBLIC_ROUTES = ["/inicio", "/login","/cadastro", "/colaborador/login", "/recuperar-senha", "/redefinir-senha", "/offline", "/api/stripe/webhook", "/api/kiwify/webhook"];
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 type CollaboratorAccess = {

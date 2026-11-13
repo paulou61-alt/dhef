@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { getAccessContext } from "@/lib/access";
+import { createClient } from "@/lib/supabase/server";
 import { getSubscription, hasAccess, trialDaysLeft } from "@/lib/billing/subscription";
 import { getStripe } from "@/lib/billing/stripe";
 import { ALL_LOOKUP_KEYS } from "@/lib/billing/plans";
@@ -31,6 +32,8 @@ export default async function PlanosPage({ searchParams }: { searchParams: { suc
   const subscription = await getSubscription(access);
   const blocked = !hasAccess(subscription);
   const prices = access.role === "owner" ? await loadPrices() : {};
+  // Vai junto no link da Kiwify para o aviso de pagamento achar a conta certa.
+  const { data: { user } } = await createClient().auth.getUser();
 
   return (
     <div className="min-h-dvh bg-[radial-gradient(circle_at_top_right,_rgba(47,91,246,0.07),_transparent_28%),linear-gradient(to_bottom,_#f8fafc,_#f5f7fb)] px-4 py-6 md:py-10">
@@ -68,6 +71,9 @@ export default async function PlanosPage({ searchParams }: { searchParams: { suc
             blocked={blocked}
             success={searchParams.sucesso === "1"}
             prices={prices}
+            ownerId={access.ownerId}
+            email={user?.email ?? null}
+            name={access.name}
           />
         )}
       </div>
