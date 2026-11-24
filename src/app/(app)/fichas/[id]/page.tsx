@@ -1,3 +1,4 @@
+import { ExportCustomerButton } from "@/components/customers/ExportCustomerButton";
 import { CustomerDiscounts } from "@/components/customers/CustomerDiscounts";
 import { saleDirectPayment } from "@/lib/customer-discounts";
 import Link from "next/link";
@@ -91,6 +92,8 @@ export default async function FichaClientePage({ params }: { params: { id: strin
           </div>
           {access?.role !== "cobrador" && <Link href={`/clientes/${customer.id}/editar`} className="btn-secondary px-4 py-2.5 text-sm">Editar cliente</Link>}
         </div>
+
+        <ExportCustomerButton customerId={customer.id} />
 
         <div className="mt-4 rounded-xl bg-surface-muted p-3">
           <p className="text-xs text-slate-500">Colaborador responsável</p>

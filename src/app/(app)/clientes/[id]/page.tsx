@@ -1,3 +1,4 @@
+import { ExportCustomerButton } from "@/components/customers/ExportCustomerButton";
 import { CustomerDiscounts } from "@/components/customers/CustomerDiscounts";
 import { saleDirectPayment } from "@/lib/customer-discounts";
 import Link from "next/link";
@@ -110,6 +111,8 @@ export default async function CustomerDetailPage({ params, searchParams }: { par
             <Pencil size={16} />
           </Link>
         </div>
+
+        {access?.viewPermissions.includes("fichas") && <ExportCustomerButton customerId={customer.id} />}
 
         <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-4">
           <CustomerStat label="Total comprado" value={formatCurrency(totalPurchased)} />
