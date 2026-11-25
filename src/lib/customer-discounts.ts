@@ -29,3 +29,16 @@ export function saleDirectPayment(sale: { id: string; total: unknown; down_payme
   return installmentSaleIds.has(sale.id) ? Number(sale.down_payment ?? 0)
     : sale.is_paid ? Number(sale.total) : Number(sale.down_payment ?? 0);
 }
+
+/**
+ * Saldo que o cliente fica devendo logo após o cadastro: o saldo devedor inicial
+ * mais a parte não paga da primeira compra (fiado ou parcelado, descontada a entrada).
+ */
+export function initialOpenAmount(input: {
+  openingBalance: number; purchaseTotal: number; paymentMethod: string; downPayment: number;
+}): number {
+  const cents = (value: number) => Math.round((Number.isFinite(value) ? Math.max(0, value) : 0) * 100);
+  const onCredit = input.paymentMethod === "fiado" || input.paymentMethod === "parcelado";
+  const purchaseOpen = onCredit ? Math.max(0, cents(input.purchaseTotal) - cents(input.downPayment)) : 0;
+  return (cents(input.openingBalance) + purchaseOpen) / 100;
+}

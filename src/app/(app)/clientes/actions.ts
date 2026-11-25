@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { validateDiscountAmount } from "@/lib/customer-discounts";
 
 import { revalidatePath } from "next/cache";
@@ -110,14 +111,27 @@ export async function createCustomer(formData: FormData): Promise<CustomerFormSt
   let openingBalance: number | null;
   let initialItems: Array<{ product_variant_id: string; quantity: number }>;
   let initialDownPayment: number | null;
+  let initialDiscount: number | null;
   try {
     payload = buildCustomerPayload(formData);
     openingBalance = parseCurrencyField(formData, "opening_balance");
     initialItems = parseInitialPurchaseItems(formData);
     initialDownPayment = parseCurrencyField(formData, "initial_down_payment");
+    initialDiscount = parseCurrencyField(formData, "initial_discount");
   } catch (e: any) {
     return { error: e.message };
   }
+
+  const wantsDiscount = (initialDiscount ?? 0) > 0;
+  if (wantsDiscount) {
+    if (access.role !== "owner") return { error: "Apenas o proprietário pode conceder descontos." };
+    const validation = validateDiscountAmount(initialDiscount as number);
+    if (validation) return { error: validation };
+    if ((openingBalance ?? 0) <= 0 && initialItems.length === 0) {
+      return { error: "Informe um saldo devedor inicial ou uma primeira compra para aplicar o desconto." };
+    }
+  }
+  const initialDiscountNote = getStringField(formData, "initial_discount_note")?.slice(0, 240) ?? null;
 
   if (access.role === "vendedor") payload.assigned_collaborator_id = access.collaboratorId;
 
@@ -161,12 +175,26 @@ export async function createCustomer(formData: FormData): Promise<CustomerFormSt
     }
   }
 
+  // O cliente e a dívida já estão salvos; se o desconto falhar, o cadastro continua
+  // e a ficha avisa para aplicar o desconto pela seção "Descontos".
+  let discountFailed = false;
+  if (wantsDiscount) {
+    const { error: discountApplyError } = await supabase.rpc("apply_customer_discount", {
+      p_customer_id: data.id,
+      p_amount: initialDiscount,
+      p_note: initialDiscountNote,
+      p_request_id: randomUUID(),
+    });
+    discountFailed = Boolean(discountApplyError);
+    refreshDiscountPaths(data.id);
+  }
+
   revalidatePath("/clientes");
   revalidatePath("/fichas");
   revalidatePath("/receber");
   revalidatePath("/cobrancas");
   revalidatePath("/vender");
-  redirect(`/clientes/${data.id}?created=1`);
+  redirect(`/clientes/${data.id}?created=1${discountFailed ? "&desconto=erro" : ""}`);
 }
 
 export async function updateCustomer(customerId: string, formData: FormData): Promise<CustomerFormState> {

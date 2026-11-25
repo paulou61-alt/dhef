@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseDiscountAmount, saleDirectPayment, validateDiscountAmount } from "../src/lib/customer-discounts";
+import { initialOpenAmount, parseDiscountAmount, saleDirectPayment, validateDiscountAmount } from "../src/lib/customer-discounts";
 
 test("interpreta reais com vírgula, ponto decimal e milhares sem aceitar texto inválido", () => {
   for (const [text, expected] of [["50,25", 50.25], ["1.234,56", 1234.56], ["50.25", 50.25], [" 50 ", 50]] as const) {
@@ -25,4 +25,13 @@ test("quitação com desconto não transforma abatimento em dinheiro recebido", 
   assert.equal(saleDirectPayment(sale, installmentSales) + 400, 450);
   assert.equal(saleDirectPayment(sale, new Set()), 500);
   assert.equal(saleDirectPayment({ ...sale, is_paid: false }, installmentSales), 50);
+});
+
+test("saldo inicial para desconto no cadastro soma saldo anterior e a parte a prazo da compra", () => {
+  assert.equal(initialOpenAmount({ openingBalance: 100, purchaseTotal: 480, paymentMethod: "parcelado", downPayment: 80 }), 500);
+  assert.equal(initialOpenAmount({ openingBalance: 0, purchaseTotal: 480, paymentMethod: "fiado", downPayment: 0 }), 480);
+  // Compra paga à vista não gera dívida.
+  assert.equal(initialOpenAmount({ openingBalance: 50, purchaseTotal: 480, paymentMethod: "pix", downPayment: 0 }), 50);
+  assert.equal(initialOpenAmount({ openingBalance: 0, purchaseTotal: 100, paymentMethod: "parcelado", downPayment: 150 }), 0);
+  assert.equal(initialOpenAmount({ openingBalance: 0.1, purchaseTotal: 0.2, paymentMethod: "fiado", downPayment: 0 }), 0.3);
 });
