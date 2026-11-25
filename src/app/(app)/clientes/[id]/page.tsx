@@ -22,7 +22,7 @@ const STATUS_LABELS: Record<string, { label: string; className: string }> = {
   pago: { label: "Pago", className: "bg-success/10 text-success" },
 };
 
-export default async function CustomerDetailPage({ params, searchParams }: { params: { id: string }; searchParams?: { created?: string } }) {
+export default async function CustomerDetailPage({ params, searchParams }: { params: { id: string }; searchParams?: { created?: string; desconto?: string } }) {
   const access = await getAccessContext();
   const canEditDueDates = access?.role === "owner";
   const supabase = createClient();
@@ -153,6 +153,12 @@ export default async function CustomerDetailPage({ params, searchParams }: { par
             </div>
           </div>
         </div>
+      )}
+
+      {searchParams?.desconto === "erro" && (
+        <p role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          O cliente foi cadastrado, mas o desconto não foi aplicado. Confira o saldo e aplique o desconto na seção abaixo.
+        </p>
       )}
 
       <CustomerDiscounts customerId={customer.id} openAmount={totalOpen} discounts={discounts ?? []} canManage={access?.role === "owner"} loadError={Boolean(discountsError)} />

@@ -12,7 +12,8 @@ import {
   type PurchaseProduct,
   type PurchaseVariant,
 } from "@/components/sales/PurchaseProductSelector";
-import { todayInBrazil } from "@/utils/format";
+import { formatCurrency, todayInBrazil } from "@/utils/format";
+import { initialOpenAmount, parseDiscountAmount, validateDiscountAmount } from "@/lib/customer-discounts";
 
 
 export interface CustomerCollaboratorOption {
@@ -68,10 +69,37 @@ export function CustomerForm({
   const [initialPaymentMethod, setInitialPaymentMethod] = useState("parcelado");
   const [initialInstallments, setInitialInstallments] = useState("2");
   const [initialFirstDueDate, setInitialFirstDueDate] = useState(() => todayInBrazil());
+  const [openingBalance, setOpeningBalance] = useState("");
+  const [initialDownPayment, setInitialDownPayment] = useState("");
+  const [initialDiscount, setInitialDiscount] = useState("");
+
+  // Desconto no cadastro: abate o saldo que o cliente fica devendo (só o proprietário).
+  const canDiscount = !customer && accessRole === "owner";
+  const variantById = new Map(variants.map((variant) => [variant.id, variant]));
+  const productById = new Map(products.map((product) => [product.id, product]));
+  const purchaseTotal = initialItems.reduce((sum, item) => {
+    const variant = variantById.get(item.variantId);
+    const price = Number(variant?.sale_price ?? productById.get(variant?.product_id ?? "")?.sale_price ?? 0);
+    return sum + price * item.quantity;
+  }, 0);
+  const amountOrZero = (text: string) => { const value = parseDiscountAmount(text); return Number.isFinite(value) ? value : 0; };
+  const discountBase = initialOpenAmount({
+    openingBalance: amountOrZero(openingBalance),
+    purchaseTotal: initialItems.length > 0 ? purchaseTotal : 0,
+    paymentMethod: initialPaymentMethod,
+    downPayment: amountOrZero(initialDownPayment),
+  });
+  const discountValue = amountOrZero(initialDiscount);
+  const discountError = canDiscount && discountValue > 0
+    ? discountBase <= 0
+      ? "Informe um saldo devedor inicial ou uma primeira compra a prazo para aplicar o desconto."
+      : validateDiscountAmount(discountValue, discountBase)
+    : null;
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
+    if (discountError) return setError(discountError);
     const formData = new FormData(e.currentTarget);
     if (sameAsPhone) formData.set("whatsapp", phone);
     formData.set(
@@ -273,7 +301,8 @@ export function CustomerForm({
                       className="input-field bg-white"
                       placeholder="0,00"
                       inputMode="numeric"
-                      onInput={(e) => { e.currentTarget.value = maskCurrencyInput(e.currentTarget.value); }}
+                      value={initialDownPayment}
+                      onChange={(e) => setInitialDownPayment(maskCurrencyInput(e.target.value))}
                     />
                   </div>
                   {initialPaymentMethod === "parcelado" && (
@@ -326,11 +355,49 @@ export function CustomerForm({
               className="input-field bg-white"
               placeholder="0,00"
               inputMode="numeric"
-              onInput={(e) => { e.currentTarget.value = maskCurrencyInput(e.currentTarget.value); }}
+              value={openingBalance}
+              onChange={(e) => setOpeningBalance(maskCurrencyInput(e.target.value))}
             />
             <p className="mt-1.5 text-[11px] leading-relaxed text-amber-800/80">
               Use se o cliente já possui um valor em aberto antes deste cadastro. O saldo entrará em Receber, Cobranças e no histórico da ficha.
             </p>
+          </div>
+        )}
+
+        {canDiscount && (
+          <div className="rounded-2xl border border-brand-100 bg-brand-50/50 p-4">
+            <div className="grid gap-3 sm:grid-cols-[180px_minmax(0,1fr)]">
+              <div>
+                <label className="label" htmlFor="initial_discount">Desconto (opcional)</label>
+                <input
+                  id="initial_discount"
+                  name="initial_discount"
+                  className="input-field bg-white"
+                  placeholder="0,00"
+                  inputMode="numeric"
+                  value={initialDiscount}
+                  onChange={(e) => { setInitialDiscount(maskCurrencyInput(e.target.value)); setError(null); }}
+                  aria-invalid={Boolean(discountError)}
+                  aria-describedby="initial_discount_help"
+                />
+              </div>
+              <div>
+                <label className="label" htmlFor="initial_discount_note">Motivo do desconto</label>
+                <input id="initial_discount_note" name="initial_discount_note" maxLength={240} className="input-field bg-white" placeholder="Ex.: acordo para quitação" />
+              </div>
+            </div>
+            <div id="initial_discount_help" className="mt-2 space-y-1 text-[11px] leading-relaxed">
+              {discountBase > 0 ? (
+                <p className="text-slate-600">
+                  Saldo do cliente após o cadastro: <strong>{formatCurrency(discountBase)}</strong>
+                  {discountValue > 0 && !discountError && <> · com desconto: <strong className="text-brand-700">{formatCurrency(Math.max(0, (Math.round(discountBase * 100) - Math.round(discountValue * 100)) / 100))}</strong></>}
+                </p>
+              ) : (
+                <p className="text-slate-500">O desconto vale sobre o saldo devedor inicial ou sobre a primeira compra feita no fiado ou parcelada.</p>
+              )}
+              {discountError && <p role="alert" className="font-semibold text-danger">{discountError}</p>}
+              <p className="text-slate-500">O desconto é abatido das parcelas mais antigas e fica registrado em &quot;Descontos&quot; na ficha do cliente.</p>
+            </div>
           </div>
         )}
 
@@ -345,7 +412,7 @@ export function CustomerForm({
       </section>
 
       {error && <p className="rounded-xl bg-danger/10 px-4 py-3 text-sm text-danger">{error}</p>}
-      <button type="submit" className="btn-primary w-full" disabled={isPending}>{isPending ? "Salvando..." : "Salvar cliente"}</button>
+      <button type="submit" className="btn-primary w-full" disabled={isPending || Boolean(discountError)}>{isPending ? "Salvando..." : "Salvar cliente"}</button>
     </form>
   );
 }
