@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CloudOff, Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
+import { CloudOff, CreditCard, Minus, Package, Plus, ShoppingCart, Trash2, UserRound } from "lucide-react";
 import { SelectField, type SelectOption } from "@/components/ui/SelectField";
 import { setCachedValue } from "@/lib/offline/db";
 import { submitOfflineCapableOperation } from "@/lib/offline/sync";
@@ -216,7 +216,8 @@ export function SaleForm({
   return (
     <div className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
       <div className="space-y-4">
-        <div className="card">
+        <div className="glass animate-rise p-5" style={{ animationDelay: "100ms" }}>
+          <SectionTitle icon={UserRound} title="Cliente e vendedor" />
           <label className="label">Cliente {needsCustomer ? "*" : "(opcional)"}</label>
           <SelectField
             value={customerId}
@@ -242,10 +243,10 @@ export function SaleForm({
           )}
         </div>
 
-        <div className="card space-y-3">
+        <div className="glass animate-rise space-y-3 p-5" style={{ animationDelay: "160ms" }}>
           <div className="flex items-center justify-between">
-            <h2 className="text-[15px] font-bold text-slate-900">Produtos</h2>
-            <span className="text-xs text-slate-500">{items.length} item(ns)</span>
+            <SectionTitle icon={Package} title="Produtos" className="!mb-0" />
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11.5px] font-medium tabular-nums text-slate-600">{items.length} item(ns)</span>
           </div>
 
           <div className="flex items-start gap-2">
@@ -270,12 +271,12 @@ export function SaleForm({
           </div>
 
           {items.length === 0 ? (
-            <div className="rounded-xl bg-surface-muted py-8 text-center text-sm text-slate-500">
+            <div className="rounded-2xl border border-dashed border-slate-200 py-8 text-center text-sm text-slate-500 dark:border-white/10">
               <ShoppingCart className="mx-auto mb-2 text-slate-300" size={28} />
               Adicione os produtos da venda.
             </div>
           ) : (
-            <ul className="divide-y divide-slate-100">
+            <ul className="divide-y divide-slate-100 rounded-2xl border border-slate-200/70 bg-white/60 px-3 dark:border-white/[.07] dark:!bg-white/[.03]">
               {items.map((item) => {
                 const variant = variantById.get(item.variantId)!;
                 const product = productById.get(variant.product_id);
@@ -283,7 +284,7 @@ export function SaleForm({
                 return (
                   <li key={item.variantId} className="flex items-center gap-3 py-3">
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-slate-800">{product?.name}</p>
+                      <p className="truncate text-[14px] font-medium text-slate-900">{product?.name}</p>
                       <p className="text-xs text-slate-500">{variant.variant_name} · {formatCurrency(price)}</p>
                     </div>
                     <div className="flex items-center gap-1 rounded-xl bg-surface-muted p-1">
@@ -301,8 +302,8 @@ export function SaleForm({
       </div>
 
       <div className="space-y-4">
-        <div className="card space-y-3">
-          <h2 className="text-[15px] font-bold text-slate-900">Pagamento</h2>
+        <div className="glass animate-rise space-y-3 p-5" style={{ animationDelay: "120ms" }}>
+          <SectionTitle icon={CreditCard} title="Pagamento" />
           <div>
             <label className="label">Forma de pagamento</label>
             <SelectField value={paymentMethod} onChange={setPaymentMethod} options={PAYMENT_OPTIONS} />
@@ -333,18 +334,30 @@ export function SaleForm({
           </div>
         </div>
 
-        <div className="card">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-slate-500">Total da venda</span>
-            <span className="text-2xl font-bold text-slate-900">{formatCurrency(total)}</span>
+        <div className="glass animate-rise p-5 lg:sticky lg:top-6" style={{ animationDelay: "180ms" }}>
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <span className="text-[13px] font-medium text-slate-500">Total da venda</span>
+              <p className="text-[12px] text-slate-400">{items.reduce((sum, item) => sum + item.quantity, 0)} unidade(s)</p>
+            </div>
+            <span className="whitespace-nowrap text-[30px] font-semibold leading-none tracking-[-0.04em] text-slate-900">{formatCurrency(total)}</span>
           </div>
           {notice && <p className="mt-3 flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800"><CloudOff size={16} className="mt-0.5 flex-none" />{notice}</p>}
           {error && <p className="mt-3 rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
-          <button type="button" onClick={submit} disabled={isPending || items.length === 0 || (needsCustomer && !customerId)} className="btn-primary mt-4 w-full">
+          <button type="button" onClick={submit} disabled={isPending || items.length === 0 || (needsCustomer && !customerId)} className="btn-primary mt-4 w-full !py-3.5 text-[15px]">
             {isPending ? "Salvando..." : "Concluir venda"}
           </button>
         </div>
       </div>
     </div>
+  );
+}
+
+function SectionTitle({ icon: Icon, title, className = "" }: { icon: typeof Package; title: string; className?: string }) {
+  return (
+    <h2 className={`mb-4 flex items-center gap-2.5 text-[15px] font-semibold text-slate-900 ${className}`}>
+      <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-50 text-brand-600 ring-1 ring-brand-100 dark:text-brand-300"><Icon size={16} /></span>
+      {title}
+    </h2>
   );
 }

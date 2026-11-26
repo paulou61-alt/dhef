@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CheckCircle2, Filter, MapPin, MessageCircle, WalletCards } from "lucide-react";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { FichaBadge, InitialsAvatar, StatusPill } from "@/components/ui/Badges";
+import { CountUp } from "@/components/dashboard/CountUp";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { getAccessContext } from "@/lib/access";
@@ -124,66 +127,60 @@ export default async function CobrancasPage({
   if (selectedCollaboratorId) moreParams.set("colaborador", selectedCollaboratorId);
   moreParams.set("mostrar", String(shownCount + LIST_PAGE_SIZE));
 
+  const today = todayInBrazil();
   const collaboratorQuery = selectedCollaboratorId
     ? `&colaborador=${encodeURIComponent(selectedCollaboratorId)}`
     : "";
 
+  const isPaidView = activeFilter === "pagos";
+  const tabClass = (active: boolean) =>
+    `flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-medium transition ${active ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-900/5 dark:bg-white/15 dark:text-white dark:ring-white/10" : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white"}`;
+
   return (
     <PurchaseCatalogProvider products={(products ?? []) as any} variants={(variants ?? []) as any}>
     <div className="space-y-4">
-      <div className={`card flex items-center justify-between gap-3 ${activeFilter === "pagos" ? "border border-success/20 bg-success/5" : ""}`}>
-        <div>
-          <p className="text-sm text-slate-500">{activeFilter === "pagos" ? "Clientes quitados" : "Carteira de cobrança"}</p>
-          <p className={`mt-1 text-2xl font-bold ${activeFilter === "pagos" ? "text-success" : "text-slate-900"}`}>
-            {formatCurrency(activeFilter === "pagos" ? totalPaid : totalOpen)}
-          </p>
-          <p className="mt-1 text-xs text-slate-500">
-            {activeFilter === "pagos" ? `${paidAccounts.length} cliente(s) com conta quitada` : `${debtors.length} cliente(s) com pendência`}
-            {selectedCollaborator ? ` · ${selectedCollaborator.name}` : ""}
-          </p>
-        </div>
-        <span className={`flex h-12 w-12 items-center justify-center rounded-2xl ${activeFilter === "pagos" ? "bg-success/10 text-success" : "bg-brand-50 text-brand-600"}`}>
-          {activeFilter === "pagos" ? <CheckCircle2 size={22} /> : <WalletCards size={22} />}
-        </span>
-      </div>
+      <PageHeader icon={WalletCards} eyebrow="Cobrança" title="Cobranças" subtitle="Parcelas por cliente, com cobrança no WhatsApp e endereço no mapa." />
 
-      <div className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1.5">
-        <Link
-          href={`/cobrancas?status=devedores${collaboratorQuery}`}
-          className={`rounded-xl px-4 py-2.5 text-center text-sm font-bold transition ${activeFilter === "devedores" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
-        >
-          Devedores <span className="ml-1 text-xs">({debtors.length})</span>
-        </Link>
-        <Link
-          href={`/cobrancas?status=pagos${collaboratorQuery}`}
-          className={`rounded-xl px-4 py-2.5 text-center text-sm font-bold transition ${activeFilter === "pagos" ? "bg-white text-success shadow-sm" : "text-slate-500"}`}
-        >
-          Pagos <span className="ml-1 text-xs">({paidAccounts.length})</span>
-        </Link>
-      </div>
+      <section className="glass animate-rise p-5 md:p-6" style={{ animationDelay: "100ms" }}>
+        <div className="grid gap-5 md:grid-cols-[1fr_auto] md:items-end">
+          <div>
+            <p className="text-[13px] font-medium text-slate-500">{isPaidView ? "Total pago pelos clientes quitados" : "Carteira de cobrança"}</p>
+            <p className={`mt-2 whitespace-nowrap text-[34px] font-semibold leading-none tracking-[-0.04em] md:text-[42px] ${isPaidView ? "text-emerald-700" : "text-slate-900"}`}>
+              <CountUp value={isPaidView ? totalPaid : totalOpen} format="currency" className="text-shine" />
+            </p>
+            <p className="mt-2 text-[13px] text-slate-500">
+              {isPaidView ? `${paidAccounts.length} cliente(s) com conta quitada` : `${debtors.length} cliente(s) com pendência`}
+              {selectedCollaborator ? ` · ${selectedCollaborator.name}` : ""}
+            </p>
+          </div>
+          <div className="grid grid-cols-2 rounded-xl border border-slate-200/80 bg-slate-100/80 p-1 dark:border-white/10 dark:!bg-white/5 md:w-[280px]">
+            <Link href={`/cobrancas?status=devedores${collaboratorQuery}`} className={tabClass(!isPaidView)}>
+              Devedores <span className="text-[11.5px] tabular-nums text-slate-400">{debtors.length}</span>
+            </Link>
+            <Link href={`/cobrancas?status=pagos${collaboratorQuery}`} className={tabClass(isPaidView)}>
+              Pagos <span className="text-[11.5px] tabular-nums text-slate-400">{paidAccounts.length}</span>
+            </Link>
+          </div>
+        </div>
 
-      <form method="get" className="card">
-        <input type="hidden" name="status" value={activeFilter} />
-        <div className="flex items-center gap-2 text-sm font-bold text-slate-800">
-          <Filter size={16} className="text-brand-600" />
-          Filtro por colaborador
-        </div>
-        <div className="mt-3">
-          <CollaboratorFilterSelect
-            collaborators={activeCollaborators}
-            defaultValue={selectedCollaboratorId}
-            includeUnassigned={false}
-          />
-        </div>
-        <p className="mt-2 text-[11px] text-slate-500">
-          O filtro usa o colaborador responsável cadastrado na ficha. Cada colaborador possui sua própria sequência de fichas #1 a #1000.
-        </p>
-      </form>
+        <form method="get" className="mt-5 border-t border-slate-100 pt-4">
+          <input type="hidden" name="status" value={activeFilter} />
+          <label className="label flex items-center gap-1.5"><Filter size={13} className="text-brand-500" /> Filtrar por colaborador</label>
+          <div className="md:max-w-sm">
+            <CollaboratorFilterSelect
+              collaborators={activeCollaborators}
+              defaultValue={selectedCollaboratorId}
+              includeUnassigned={false}
+            />
+          </div>
+          <p className="mt-2 text-[11.5px] text-slate-500">Usa o colaborador responsável cadastrado na ficha.</p>
+        </form>
+      </section>
 
       {activeFilter === "devedores" ? (
         debtors.length === 0 ? (
-          <div className="card py-12 text-center text-sm text-slate-500">Nenhuma cobrança pendente para este filtro.</div>
-        ) : debtors.slice(0, shownCount).map(({ customer, openItems }) => {
+          <div className="glass py-12 text-center text-sm text-slate-500">Nenhuma cobrança pendente para este filtro.</div>
+        ) : debtors.slice(0, shownCount).map(({ customer, openItems }, index) => {
           const openTotal = openItems.reduce((sum, item) => sum + Number(item.amount) - Number(item.paid_amount), 0);
           const phone = customer.whatsapp ?? customer.phone;
           const addressParts = [customer.address, customer.neighborhood, customer.city, customer.state, customer.zip_code].filter(Boolean);
@@ -199,24 +196,26 @@ export default async function CobrancasPage({
           }));
           const message = buildChargeMessage(customer.name, chargeItems);
           const mapsUrl = fullAddress ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}` : null;
+          const hasOverdue = openItems.some((item) => item.status === "vencido" || item.due_date < today);
 
           return (
-            <div key={customer.id} className="card">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
+            <section key={customer.id} className={`glass p-4 md:p-5 ${index < 6 ? "animate-rise" : ""}`} style={index < 6 ? { animationDelay: `${160 + index * 50}ms` } : undefined}>
+              <div className="flex items-start gap-3">
+                <InitialsAvatar name={customer.name} size="lg" />
+                <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-base font-bold text-slate-900">{customer.name}</h2>
-                    <span className="rounded-full bg-brand-50 px-2 py-1 text-[11px] font-bold text-brand-700">Ficha #{customer.ficha_number}</span>
+                    <h2 className="text-[15px] font-semibold text-slate-900">{customer.name}</h2>
+                    <FichaBadge number={customer.ficha_number} />
                   </div>
                   {fullAddress && (
-                    <p className="mt-1 flex items-start gap-1 text-xs text-slate-500">
+                    <p className="mt-1 flex items-start gap-1 text-[12px] text-slate-500">
                       <MapPin size={13} className="mt-0.5 flex-shrink-0" /> {fullAddress}
                     </p>
                   )}
                 </div>
-                <div className="text-right">
-                  <p className="text-xs text-slate-500">Em aberto</p>
-                  <p className="text-lg font-bold text-warning">{formatCurrency(openTotal)}</p>
+                <div className="flex flex-none flex-col items-end gap-1">
+                  <p className="whitespace-nowrap text-[18px] font-semibold tabular-nums tracking-tight text-slate-900">{formatCurrency(openTotal)}</p>
+                  <StatusPill tone={hasOverdue ? "danger" : "warning"}>{hasOverdue ? "Em atraso" : "Em aberto"}</StatusPill>
                 </div>
               </div>
 
@@ -224,21 +223,22 @@ export default async function CobrancasPage({
                 {openItems.map((item) => {
                   const open = Number(item.amount) - Number(item.paid_amount);
                   const paid = Number(item.paid_amount);
-                  const overdue = item.status === "vencido" || item.due_date < todayInBrazil();
+                  const overdue = item.status === "vencido" || item.due_date < today;
                   return (
-                    <div key={item.id} className="flex flex-wrap items-center gap-3 rounded-xl bg-surface-muted p-3">
+                    <div key={item.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200/70 bg-white/70 p-3 dark:border-white/[.07] dark:!bg-white/[.03]">
+                      <span className={`h-8 w-1 flex-none rounded-full ${overdue ? "bg-rose-500" : "bg-brand-300"}`} aria-hidden />
                       <div className="min-w-0 flex-1">
-                        <p className={`text-sm font-semibold ${item.isOpeningBalance ? "text-amber-700" : "text-slate-800"}`}>
+                        <p className={`text-[13.5px] font-medium ${item.isOpeningBalance ? "text-amber-700" : "text-slate-900"}`}>
                           {item.isOpeningBalance ? "Saldo devedor inicial" : `Parcela ${item.installment_number}/${item.total_installments} · Venda #${item.saleNumber}`}
                         </p>
-                        <p className={`text-xs ${overdue ? "text-danger" : "text-slate-500"}`}>
+                        <p className={`text-[12px] ${overdue ? "text-rose-600 dark:text-rose-300" : "text-slate-500"}`}>
                           {overdue ? "Vencida" : "Vence"} em {formatDate(item.due_date)}
+                          {paid > 0 && <span className="text-emerald-700"> · já pago {formatCurrency(paid)}</span>}
                         </p>
-                        {paid > 0 && <p className="mt-1 text-xs font-semibold text-success">Já pago: {formatCurrency(paid)}</p>}
                       </div>
                       <div className="text-right">
-                        <p className="text-[10px] uppercase tracking-wide text-slate-400">Falta</p>
-                        <p className="text-sm font-bold text-slate-900">{formatCurrency(open)}</p>
+                        <p className="text-[11px] text-slate-500">Falta</p>
+                        <p className="text-[14px] font-semibold tabular-nums text-slate-900">{formatCurrency(open)}</p>
                       </div>
                       <ReceiveButton
                         installmentId={item.id}
@@ -253,61 +253,60 @@ export default async function CobrancasPage({
                 })}
               </div>
 
-              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 {phone && (
-                  <a href={whatsappLink(phone, message)} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 rounded-xl bg-success px-4 py-3 text-sm font-semibold text-white">
-                    <MessageCircle size={17} /> Cobrar no WhatsApp
+                  <a href={whatsappLink(phone, message)} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-emerald-500 to-emerald-600 px-4 py-2.5 text-[13.5px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,.18),0_8px_20px_-8px_rgba(16,185,129,.7)] transition hover:-translate-y-0.5">
+                    <MessageCircle size={16} /> Cobrar no WhatsApp
                   </a>
                 )}
                 {mapsUrl && (
-                  <a href={mapsUrl} target="_blank" rel="noreferrer" className="btn-secondary flex items-center justify-center gap-2">
-                    <MapPin size={17} /> Abrir endereço no Maps
+                  <a href={mapsUrl} target="_blank" rel="noreferrer" className="btn-secondary !py-2.5 text-[13.5px] font-medium">
+                    <MapPin size={16} /> Abrir endereço no Maps
                   </a>
                 )}
               </div>
-            </div>
+            </section>
           );
         })
       ) : paidAccounts.length === 0 ? (
-        <div className="card py-12 text-center text-sm text-slate-500">Nenhum cliente quitado para este filtro.</div>
-      ) : paidAccounts.slice(0, shownCount).map(({ customer, items }) => {
+        <div className="glass py-12 text-center text-sm text-slate-500">Nenhum cliente quitado para este filtro.</div>
+      ) : paidAccounts.slice(0, shownCount).map(({ customer, items }, index) => {
         const paidTotal = items.reduce((sum, item) => sum + Number(item.paid_amount), 0);
         return (
-          <div key={customer.id} className="card border border-success/20 bg-success/5">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
+          <section key={customer.id} className={`glass p-4 md:p-5 ${index < 6 ? "animate-rise" : ""}`} style={index < 6 ? { animationDelay: `${160 + index * 50}ms` } : undefined}>
+            <div className="flex items-start gap-3">
+              <InitialsAvatar name={customer.name} tone="success" size="lg" />
+              <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="truncate text-base font-bold text-success">{customer.name}</h2>
-                  <span className="rounded-full bg-brand-50 px-2 py-1 text-[11px] font-bold text-brand-700">Ficha #{customer.ficha_number}</span>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-1 text-[10px] font-bold text-success">
-                    <CheckCircle2 size={11} /> Quitado
-                  </span>
+                  <h2 className="truncate text-[15px] font-semibold text-slate-900">{customer.name}</h2>
+                  <FichaBadge number={customer.ficha_number} />
+                  <StatusPill tone="success">Quitado</StatusPill>
                 </div>
-                <p className="mt-1 text-xs text-slate-500">Todas as pendências registradas estão pagas.</p>
+                <p className="mt-1 text-[12px] text-slate-500">Todas as pendências registradas estão pagas.</p>
               </div>
               <div className="text-right">
-                <p className="text-xs text-slate-500">Total pago</p>
-                <p className="text-lg font-bold text-success">{formatCurrency(paidTotal)}</p>
+                <p className="text-[11px] text-slate-500">Total pago</p>
+                <p className="whitespace-nowrap text-[18px] font-semibold tabular-nums text-emerald-700">{formatCurrency(paidTotal)}</p>
               </div>
             </div>
 
             <div className="mt-4 space-y-2">
               {items.map((item) => (
-                <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl bg-white/80 p-3">
+                <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200/70 bg-white/70 p-3 dark:border-white/[.07] dark:!bg-white/[.03]">
                   <div className="min-w-0">
-                    <p className={`text-sm font-semibold ${item.isOpeningBalance ? "text-amber-700" : "text-slate-800"}`}>
+                    <p className={`text-[13.5px] font-medium ${item.isOpeningBalance ? "text-amber-700" : "text-slate-900"}`}>
                       {item.isOpeningBalance ? "Saldo devedor inicial" : `Parcela ${item.installment_number}/${item.total_installments} · Venda #${item.saleNumber}`}
                     </p>
-                    <p className="text-xs text-slate-500">Vencimento {formatDate(item.due_date)}</p>
+                    <p className="text-[12px] text-slate-500">Vencimento {formatDate(item.due_date)}</p>
                   </div>
-                  <div className="flex flex-shrink-0 items-center gap-2 font-bold text-success">
-                    <CheckCircle2 size={16} />
-                    <span className="text-sm">{formatCurrency(Number(item.paid_amount))}</span>
+                  <div className="flex flex-shrink-0 items-center gap-1.5 text-emerald-700">
+                    <CheckCircle2 size={15} />
+                    <span className="text-[14px] font-semibold tabular-nums">{formatCurrency(Number(item.paid_amount))}</span>
                   </div>
                 </div>
               ))}
             </div>
-          </div>
+          </section>
         );
       })}
 
