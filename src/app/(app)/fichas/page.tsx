@@ -6,6 +6,8 @@ import { fetchAll } from "@/lib/supabase/fetch-all";
 import { getAccessContext } from "@/lib/access";
 import { SearchBar } from "@/components/ui/SearchBar";
 import { formatCurrency } from "@/utils/format";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { StatusPill } from "@/components/ui/Badges";
 
 export const dynamic = "force-dynamic";
 
@@ -150,37 +152,44 @@ export default async function FichasPage({ searchParams }: { searchParams: Searc
   });
   const totalAvailable = [...availabilityByGroup.values()].reduce((sum, group) => sum + group.count, 0);
 
+  const chipClass = (active: boolean) =>
+    `whitespace-nowrap rounded-full px-3.5 py-1.5 text-[12.5px] font-medium ring-1 ring-inset transition ${active ? "bg-gradient-to-b from-brand-400 to-brand-500 text-white ring-brand-500 shadow-[0_6px_14px_-6px_rgba(47,91,246,.7)]" : "bg-white/80 text-slate-600 ring-slate-200 hover:text-slate-900 hover:ring-slate-300 dark:!bg-white/[.04] dark:text-slate-300 dark:ring-white/10"}`;
+  const activeTotal = (customers ?? []).filter((customer) => !isReleased(customer.id)).length;
+
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-bold text-slate-900">Fichas</h1>
-        <p className="mt-1 text-sm text-slate-500">{isOwner ? "Fichas numeradas e organizadas por colaborador responsável." : "Aqui aparecem somente as fichas de clientes vinculados a você."}</p>
-      </div>
+      <PageHeader
+        icon={ClipboardList}
+        eyebrow={isOwner ? `${activeTotal} fichas ativas` : "Suas fichas"}
+        title="Fichas"
+        subtitle={isOwner ? "Fichas numeradas e organizadas por colaborador responsável." : "Aqui aparecem somente as fichas de clientes vinculados a você."}
+      />
 
-      <SearchBar placeholder="Buscar por nome, endereço, bairro ou número da ficha..." />
+      <div className="animate-rise" style={{ animationDelay: "100ms" }}><SearchBar placeholder="Buscar por nome, endereço, bairro ou número da ficha..." /></div>
 
       {isOwner && (
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          <Link href={categoryHref(null, query)} className={`whitespace-nowrap rounded-full px-3 py-2 text-xs font-semibold ${!collaboratorFilter ? "bg-brand-500 text-white" : "bg-white text-slate-600"}`}>Todos</Link>
+        <div className="animate-rise -mx-1 flex gap-2 overflow-x-auto px-1 pb-1" style={{ animationDelay: "140ms" }}>
+          <Link href={categoryHref(null, query)} className={chipClass(!collaboratorFilter)}>Todos</Link>
           {(collaborators ?? []).map((collaborator) => (
-            <Link key={collaborator.id} href={categoryHref(collaborator.id, query)} className={`whitespace-nowrap rounded-full px-3 py-2 text-xs font-semibold ${collaboratorFilter === collaborator.id ? "bg-brand-500 text-white" : "bg-white text-slate-600"}`}>
+            <Link key={collaborator.id} href={categoryHref(collaborator.id, query)} className={chipClass(collaboratorFilter === collaborator.id)}>
               {collaborator.name}
             </Link>
           ))}
-          <Link href={categoryHref("sem", query)} className={`whitespace-nowrap rounded-full px-3 py-2 text-xs font-semibold ${collaboratorFilter === "sem" ? "bg-brand-500 text-white" : "bg-white text-slate-600"}`}>Sem colaborador</Link>
+          <Link href={categoryHref("sem", query)} className={chipClass(collaboratorFilter === "sem")}>Sem colaborador</Link>
         </div>
       )}
 
       {!query && groupKeys.length > 0 && (
-        <section className="card !p-0 overflow-hidden border border-emerald-200">
-          <div className="flex items-center gap-2 border-b border-emerald-100 bg-emerald-50 px-4 py-3">
-            <CircleCheckBig size={17} className="text-emerald-600" />
-            <div className="flex-1">
-              <p className="text-sm font-bold text-emerald-900">Fichas disponíveis para novos clientes</p>
-              <p className="text-[11px] text-emerald-700">
+        <section className="glass animate-rise" style={{ animationDelay: "180ms" }}>
+          <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4">
+            <span className="flex h-9 w-9 flex-none items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-600/15"><CircleCheckBig size={17} /></span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[15px] font-semibold text-slate-900">Fichas disponíveis para novos clientes</p>
+              <p className="text-[12.5px] text-slate-500">
                 {totalAvailable > 0 ? `${totalAvailable} ficha(s) livre(s). Toque numa ficha para cadastrar o cliente já com esse número.` : "Nenhuma ficha liberada no momento. Use o próximo número da sequência."}
               </p>
             </div>
+            {totalAvailable > 0 && <StatusPill tone="success">{totalAvailable} livre(s)</StatusPill>}
           </div>
           <div className="divide-y divide-slate-100">
             {groupKeys.map((key) => {
@@ -192,8 +201,8 @@ export default async function FichasPage({ searchParams }: { searchParams: Searc
                 ...info.gaps.map((number) => ({ number, name: null as string | null })),
               ].sort((x, y) => x.number - y.number);
               return (
-                <div key={key} className="px-4 py-3">
-                  <p className="mb-2 text-xs font-bold text-slate-700">
+                <div key={key} className="px-5 py-3">
+                  <p className="mb-2 text-[12.5px] font-medium text-slate-700">
                     {collaborator?.name ?? "Sem colaborador"}
                     <span className="ml-1 font-normal text-slate-400">· {info.count} disponível(is)</span>
                   </p>
@@ -203,10 +212,10 @@ export default async function FichasPage({ searchParams }: { searchParams: Searc
                         key={number}
                         href={newCustomerHref(number, key)}
                         title={name ? `Cadastrar cliente na ficha #${number} (era de ${name})` : `Cadastrar cliente na ficha #${number}`}
-                        className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-bold shadow-sm transition ${
+                        className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[12px] font-medium ring-1 ring-inset transition ${
                           name
-                            ? "border-emerald-300 bg-white text-emerald-700 hover:border-emerald-600 hover:bg-emerald-600 hover:text-white"
-                            : "border-slate-200 bg-white text-slate-600 hover:border-brand-500 hover:bg-brand-500 hover:text-white"
+                            ? "bg-emerald-50 text-emerald-700 ring-emerald-600/20 hover:bg-emerald-600 hover:text-white"
+                            : "bg-white/80 text-slate-600 ring-slate-200 hover:bg-brand-500 hover:text-white hover:ring-brand-500 dark:!bg-white/[.04] dark:ring-white/10"
                         }`}
                       >
                         <Plus size={12} /> Ficha #{number}
@@ -216,7 +225,7 @@ export default async function FichasPage({ searchParams }: { searchParams: Searc
                     {chips.length > 40 && <span className="px-1 py-1.5 text-xs text-slate-500">e mais {chips.length - 40}</span>}
                     <Link
                       href={newCustomerHref(info.highest + 1, key)}
-                      className="inline-flex items-center gap-1 rounded-lg border border-dashed border-brand-300 bg-brand-50 px-2.5 py-1.5 text-xs font-bold text-brand-700 transition hover:bg-brand-500 hover:text-white"
+                      className="inline-flex items-center gap-1 rounded-lg border border-dashed border-brand-300 bg-brand-50 px-2.5 py-1.5 text-[12px] font-medium text-brand-700 transition hover:border-brand-500 hover:bg-brand-500 hover:text-white"
                     >
                       <Plus size={12} /> Próxima nova: #{info.highest + 1}
                     </Link>
@@ -229,13 +238,13 @@ export default async function FichasPage({ searchParams }: { searchParams: Searc
       )}
 
       {!customers || customers.length === 0 ? (
-        <div className="card py-12 text-center">
+        <div className="glass py-12 text-center">
           <ClipboardList className="mx-auto mb-2 text-slate-300" size={30} />
           <p className="text-sm text-slate-500">Nenhuma ficha encontrada.</p>
         </div>
       ) : (
         <div className="space-y-4">
-          {groupKeys.map((key) => {
+          {groupKeys.map((key, groupIndex) => {
             const groupCustomers = grouped.get(key) ?? [];
             const releasedCount = groupCustomers.filter((customer) => isReleased(customer.id)).length;
             const activeCount = groupCustomers.length - releasedCount;
@@ -243,18 +252,18 @@ export default async function FichasPage({ searchParams }: { searchParams: Searc
             const availableCount = availabilityByGroup.get(key)?.count ?? 0;
             const collaborator = key === "sem" ? null : collaboratorMap.get(key);
             return (
-              <section key={key} className="card !p-0 overflow-hidden">
-                <div className="flex items-center gap-2 border-b border-slate-100 bg-surface-muted px-4 py-3">
-                  <Users size={16} className="text-brand-600" />
-                  <div className="flex-1">
-                    <p className="text-sm font-bold text-slate-800">{collaborator?.name ?? "Sem colaborador"}</p>
-                    <p className="text-[11px] text-slate-500">
+              <section key={key} className={`glass ${groupIndex < 3 ? "animate-rise" : ""}`} style={groupIndex < 3 ? { animationDelay: `${240 + groupIndex * 60}ms` } : undefined}>
+                <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4">
+                  <span className="flex h-9 w-9 flex-none items-center justify-center rounded-xl bg-brand-50 text-brand-600 ring-1 ring-brand-100"><Users size={16} /></span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[15px] font-semibold text-slate-900">{collaborator?.name ?? "Sem colaborador"}</p>
+                    <p className="text-[12.5px] text-slate-500">
                       {activeCount} ficha(s) ativa(s)
                       {releasedCount > 0 && ` · ${releasedCount} quitada(s)`}
                       {!query && availableCount > 0 && ` · ${availableCount} disponível(is)`}
                     </p>
                   </div>
-                  {collaborator && <span className="text-[11px] font-semibold text-slate-400">{collaborator.role === "vendedor" ? "Vendedor" : "Cobrador"}</span>}
+                  {collaborator && <StatusPill tone="neutral" dot={false}>{collaborator.role === "vendedor" ? "Vendedor" : "Cobrador"}</StatusPill>}
                 </div>
 
                 <div className="divide-y divide-slate-100">
@@ -263,27 +272,28 @@ export default async function FichasPage({ searchParams }: { searchParams: Searc
                     const open = openBalance(customer.id);
                     const released = isReleased(customer.id);
                     return (
-                      <Link key={customer.id} href={`/fichas/${customer.id}`} className="flex items-center gap-3 px-4 py-3.5">
-                        <span className={`flex h-11 min-w-11 items-center justify-center rounded-xl px-2 text-xs font-bold ${released ? "bg-slate-100 text-slate-400" : "bg-brand-50 text-brand-700"}`}>#{customer.ficha_number}</span>
+                      <Link key={customer.id} href={`/fichas/${customer.id}`} className="group flex items-center gap-3 px-4 py-3 transition hover:bg-slate-50/80 md:px-5">
+                        <span className={`flex h-11 min-w-11 flex-none items-center justify-center rounded-xl px-2 text-[12.5px] font-semibold tabular-nums ring-1 ring-inset ${released ? "bg-slate-100 text-slate-400 ring-slate-500/10" : "bg-gradient-to-br from-brand-50 to-white text-brand-700 ring-brand-600/15 dark:from-brand-500/25 dark:to-transparent dark:text-brand-200"}`}>#{customer.ficha_number}</span>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold text-slate-800">{customer.name}</p>
+                          <p className="truncate text-[14px] font-medium text-slate-900">{customer.name}</p>
                           {(customer.address || customer.neighborhood) && (
-                            <p className="truncate text-xs text-slate-500">
+                            <p className="truncate text-[12px] text-slate-500">
                               {[customer.address ? `${customer.address}${customer.house_number ? `, ${customer.house_number}` : ""}` : null, customer.neighborhood].filter(Boolean).join(" · ")}
                             </p>
                           )}
-                          <p className="text-xs text-slate-500">{stats.count} compra(s) · {formatCurrency(stats.total)} comprado</p>
+                          <p className="text-[12px] text-slate-400">{stats.count} compra(s) · {formatCurrency(stats.total)} comprado</p>
                         </div>
                         {writeOffById.has(customer.id) ? (
-                          <span className="rounded-full bg-red-100 px-2 py-1 text-[10px] font-bold text-red-700">
-                            {writeOffById.get(customer.id) === "prego" ? "Prego" : "Mudou"} · ficha liberada
-                          </span>
+                          <StatusPill tone="danger">{writeOffById.get(customer.id) === "prego" ? "Prego" : "Mudou"} · ficha liberada</StatusPill>
                         ) : open > 0 ? (
-                          <div className="text-right"><p className="text-xs text-slate-500">Em aberto</p><p className="text-sm font-bold text-warning">{formatCurrency(open)}</p></div>
+                          <div className="flex flex-none flex-col items-end gap-0.5">
+                            <span className="text-[11px] text-slate-500">Em aberto</span>
+                            <span className="whitespace-nowrap text-[14px] font-semibold tabular-nums text-slate-900">{formatCurrency(open)}</span>
+                          </div>
                         ) : stats.saleIds.length > 0 ? (
-                          <span className="rounded-full bg-success/10 px-2 py-1 text-[10px] font-bold text-success">Quitado · ficha liberada</span>
+                          <StatusPill tone="success">Quitado · ficha liberada</StatusPill>
                         ) : null}
-                        <ChevronRight size={18} className="text-slate-300" />
+                        <ChevronRight size={17} className="flex-none text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-brand-500" />
                       </Link>
                     );
                   })}

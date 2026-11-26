@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import { ShoppingCart } from "lucide-react";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { SaleForm } from "@/components/sales/SaleForm";
 import { getAccessContext } from "@/lib/access";
@@ -24,10 +26,7 @@ export default async function VenderPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-bold text-slate-900">Nova venda</h1>
-        <p className="mt-1 text-sm text-slate-500">Selecione os produtos, o cliente e a forma de pagamento.</p>
-      </div>
+      <PageHeader icon={ShoppingCart} eyebrow="Vendas" title="Nova venda" subtitle="Selecione os produtos, o cliente e a forma de pagamento." />
       <SaleForm customers={customers ?? []} products={products ?? []} variants={variants ?? []} sellers={sellers ?? []} />
     </div>
   );

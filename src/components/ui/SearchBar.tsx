@@ -26,9 +26,9 @@ export function SearchBar({ placeholder }: { placeholder: string }) {
 
   return (
     <div className="relative">
-      <Search size={17} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+      <Search size={17} className={`pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 ${isPending ? "animate-pulse text-brand-500" : "text-slate-400"}`} />
       <input
-        className="input-field pl-10 pr-9"
+        className="input-field !rounded-2xl !border-slate-200/80 !bg-white/80 pl-11 pr-9 shadow-[0_1px_2px_rgba(15,23,42,.04),0_8px_24px_-14px_rgba(15,23,42,.18)] dark:!border-white/10 dark:!bg-white/[.04]"
         placeholder={placeholder}
         value={value}
         onChange={(e) => updateQuery(e.target.value)}

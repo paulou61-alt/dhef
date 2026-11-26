@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { Users, ChevronRight, MessageCircle, CheckCircle2 } from "lucide-react";
+import { Users, ChevronRight, MessageCircle, Plus } from "lucide-react";
+import { PageHeader, headerPrimaryButton } from "@/components/ui/PageHeader";
+import { InitialsAvatar, StatusPill } from "@/components/ui/Badges";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { getAccessContext } from "@/lib/access";
@@ -68,39 +70,55 @@ export default async function ClientesPage({ searchParams }: { searchParams: { q
   if (query) moreParams.set("q", query);
   moreParams.set("mostrar", String(shownCount + LIST_PAGE_SIZE));
 
+  const owingCount = (customers ?? []).filter((c) => (chargesByCustomer.get(c.id) ?? []).some((item) => item.openAmount > 0)).length;
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex-1"><SearchBar placeholder="Buscar cliente..." /></div>
-        {canCreate && <Link href="/clientes/novo" className="btn-primary hidden px-5 py-3 md:flex">Novo cliente</Link>}
-      </div>
+      <PageHeader
+        icon={Users}
+        eyebrow="Carteira de clientes"
+        title="Clientes"
+        subtitle={`${(customers ?? []).length} ${query ? "encontrado(s)" : "cadastrado(s)"} · ${owingCount} com saldo em aberto`}
+        actions={canCreate ? <Link href="/clientes/novo" className={`${headerPrimaryButton} hidden md:flex`}><Plus size={16} /> Novo cliente</Link> : undefined}
+      />
+
+      <div className="animate-rise" style={{ animationDelay: "100ms" }}><SearchBar placeholder="Buscar cliente..." /></div>
 
       {!customers || customers.length === 0 ? (
         <EmptyState icon={Users} title={query ? "Nenhum cliente encontrado" : "Nenhum cliente cadastrado"} description={query ? "Tente buscar por outro nome." : "Cadastre seu primeiro cliente para começar a vender."} actionLabel={!query && canCreate ? "Novo cliente" : undefined} actionHref={!query && canCreate ? "/clientes/novo" : undefined} />
       ) : (
-        <ul className="card divide-y divide-slate-100 !p-0 overflow-hidden">
+        <ul className="glass animate-rise divide-y divide-slate-100" style={{ animationDelay: "160ms" }}>
           {visibleCustomers.map((c) => {
             const charges = chargesByCustomer.get(c.id) ?? [];
             const balance = charges.reduce((sum, item) => sum + item.openAmount, 0);
+            const overdue = charges.some((item) => item.status === "vencido");
             const phone = c.whatsapp ?? c.phone;
             const message = buildChargeMessage(c.name, charges);
             const isSettled = customersWithPurchases.has(c.id) && balance <= 0;
 
             return (
-              <li key={c.id} className={`flex items-center gap-2 px-3 py-3 transition-colors ${isSettled ? "bg-success/5" : "bg-white"}`}>
+              <li key={c.id} className="group flex items-center gap-2 px-3 py-2.5 transition hover:bg-slate-50/80 md:px-4">
                 <Link href={`/clientes/${c.id}`} className="flex min-w-0 flex-1 items-center gap-3 rounded-xl px-1 py-1">
-                  <span className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-[14px] font-bold ${isSettled ? "bg-success/10 text-success" : "bg-brand-50 text-brand-600"}`}>{c.name.charAt(0).toUpperCase()}</span>
+                  <InitialsAvatar name={c.name} tone={isSettled ? "success" : "brand"} />
                   <div className="min-w-0 flex-1">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <p className={`truncate text-[14px] font-semibold ${isSettled ? "text-success" : "text-slate-800"}`}>{c.name}</p>
-                      {isSettled && <span className="hidden flex-shrink-0 items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-bold text-success sm:inline-flex"><CheckCircle2 size={11} /> Quitado</span>}
-                    </div>
+                    <p className="truncate text-[14px] font-medium text-slate-900">{c.name}</p>
                     <p className="truncate text-[12px] text-slate-500">{c.phone ?? c.city ?? "Sem informações"}</p>
                   </div>
-                  {balance > 0 ? <span className="flex-shrink-0 text-[13px] font-bold text-warning">{formatCurrency(balance)}</span> : isSettled ? <span className="flex flex-shrink-0 items-center gap-1 text-[12px] font-bold text-success"><CheckCircle2 size={14} /> Pago</span> : null}
-                  <ChevronRight size={18} className={`flex-shrink-0 ${isSettled ? "text-success/50" : "text-slate-300"}`} />
+                  {balance > 0 ? (
+                    <div className="flex flex-none flex-col items-end gap-0.5">
+                      <span className="whitespace-nowrap text-[14px] font-semibold tabular-nums text-slate-900">{formatCurrency(balance)}</span>
+                      <StatusPill tone={overdue ? "danger" : "warning"} className="!px-1.5 !py-0 !text-[10.5px]">{overdue ? "Em atraso" : "A receber"}</StatusPill>
+                    </div>
+                  ) : isSettled ? (
+                    <StatusPill tone="success">Quitado</StatusPill>
+                  ) : null}
+                  <ChevronRight size={17} className="flex-none text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-brand-500" />
                 </Link>
-                {balance > 0 && phone && <a href={whatsappLink(phone, message)} target="_blank" rel="noreferrer" aria-label={`Cobrar ${c.name} no WhatsApp`} className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-success text-white"><MessageCircle size={18} /></a>}
+                {balance > 0 && phone && (
+                  <a href={whatsappLink(phone, message)} target="_blank" rel="noreferrer" aria-label={`Cobrar ${c.name} no WhatsApp`} className="flex h-9 w-9 flex-none items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 ring-1 ring-inset ring-emerald-600/15 transition hover:bg-emerald-100 dark:text-emerald-300 dark:ring-emerald-400/25">
+                    <MessageCircle size={17} />
+                  </a>
+                )}
               </li>
             );
           })}
