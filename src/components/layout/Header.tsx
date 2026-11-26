@@ -9,6 +9,7 @@ import type { AppRole } from "@/lib/access";
 import type { Feature } from "@/lib/billing/plans";
 import { useLogout } from "@/lib/use-logout";
 import { BrandMark } from "@/components/brand/BrandMark";
+import { ThemeIconButton } from "@/components/theme/ThemeToggle";
 
 function getTitle(pathname: string): string {
   const all = [...ALL_NAV].sort((a, b) => b.href.length - a.href.length);
@@ -28,7 +29,7 @@ export function Header({ role, lockedFeatures = [] }: { role: AppRole; lockedFea
 
   return (
     <>
-      <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/85 px-4 py-3 backdrop-blur-xl md:hidden">
+      <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/70 px-4 py-3 backdrop-blur-xl dark:border-white/[.06] dark:!bg-[#050816]/70 md:hidden">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <BrandMark size={36} className="shadow-sm" />
@@ -38,6 +39,8 @@ export function Header({ role, lockedFeatures = [] }: { role: AppRole; lockedFea
             </div>
           </div>
 
+          <div className="flex flex-none items-center gap-2">
+          <ThemeIconButton />
           {secondaryItems.length > 0 ? (
             <button
               type="button"
@@ -58,6 +61,7 @@ export function Header({ role, lockedFeatures = [] }: { role: AppRole; lockedFea
               <LogOut size={16} /> Sair
             </button>
           )}
+          </div>
         </div>
       </header>
 
@@ -69,7 +73,7 @@ export function Header({ role, lockedFeatures = [] }: { role: AppRole; lockedFea
             aria-label="Fechar menu"
             onClick={() => setOpen(false)}
           />
-          <div className="absolute inset-x-3 top-[72px] overflow-hidden rounded-3xl border border-slate-200 bg-white p-3 shadow-2xl">
+          <div className="absolute inset-x-3 top-[72px] overflow-hidden rounded-3xl border border-slate-200 bg-white p-3 shadow-2xl dark:!bg-[#0b1024]/95 dark:backdrop-blur-2xl">
             <div className="mb-2 flex items-center justify-between px-2 py-1">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-400">Menu</p>

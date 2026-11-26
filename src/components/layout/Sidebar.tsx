@@ -11,6 +11,7 @@ import type { ViewPermission } from "@/lib/permissions";
 import type { Feature } from "@/lib/billing/plans";
 import { useLogout } from "@/lib/use-logout";
 import { BrandMark } from "@/components/brand/BrandMark";
+import { ThemeSwitch } from "@/components/theme/ThemeToggle";
 
 const ROLE_LABELS: Record<AppRole, string> = { owner: "Proprietário", vendedor: "Vendedor", cobrador: "Cobrador" };
 const COLLAPSED_KEY = "cobrei:sidebar-collapsed";
@@ -72,14 +73,15 @@ export function Sidebar({
         key={item.href}
         href={item.href}
         className={clsx(
-          "group flex items-center gap-3 rounded-xl px-2.5 py-2 text-[13.5px] font-medium transition duration-200",
+          "group relative flex items-center gap-3 rounded-xl px-3 py-1.5 text-[13.5px] font-medium transition duration-200",
           active
-            ? "bg-gradient-to-r from-brand-50 to-brand-50/40 text-brand-700 shadow-sm ring-1 ring-brand-100"
-            : "text-slate-600 hover:bg-white hover:text-slate-900 hover:shadow-sm"
+            ? "bg-white text-brand-700 shadow-sm ring-1 ring-slate-900/5 dark:bg-white/[.08] dark:text-white dark:ring-white/10"
+            : "text-slate-600 hover:bg-white/70 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/[.06] dark:hover:text-white"
         )}
       >
-        <span className={clsx("flex h-8 w-8 flex-none items-center justify-center rounded-lg transition", active ? "bg-brand-500 text-white shadow-sm" : "bg-slate-100 text-slate-500 group-hover:bg-slate-200/70")}>
-          <Icon size={17} strokeWidth={active ? 2.5 : 2} />
+        {active && <span aria-hidden className="absolute -left-3 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-brand-500 shadow-[0_0_12px_rgba(77,127,255,.9)] dark:bg-brand-400" />}
+        <span className={clsx("flex h-7 w-7 flex-none items-center justify-center rounded-lg transition", active ? "text-brand-600 dark:text-brand-300" : "text-slate-400 group-hover:text-slate-600 dark:text-slate-500 dark:group-hover:text-slate-200")}>
+          <Icon size={17} strokeWidth={active ? 2.4 : 2} />
         </span>
         <span className="min-w-0 flex-1 truncate">{item.label}</span>
         {locked && <Lock size={13} className="flex-none text-slate-400" aria-label="Não incluso no plano" />}
@@ -88,33 +90,24 @@ export function Sidebar({
   };
 
   const planTone = {
-    brand: "border-brand-100 bg-brand-50 text-brand-700",
+    brand: "border-brand-100 bg-gradient-to-br from-brand-50 to-white/60 text-brand-700 dark:from-brand-500/20 dark:to-transparent",
     warning: "border-amber-200 bg-amber-50 text-amber-800",
     success: "border-emerald-100 bg-emerald-50 text-emerald-700",
   };
 
   return (
-    <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-slate-200/80 bg-slate-50/95 px-4 py-5 backdrop-blur-xl md:flex">
-      <div className="mb-4 px-1">
-        <div className="flex items-center gap-3 rounded-2xl bg-slate-950 px-3 py-3 text-white shadow-floating">
-          <BrandMark size={40} className="shadow-sm" />
-          <div className="min-w-0">
-            <p className="truncate text-[14px] font-bold">Cobrei</p>
-            <p className="mt-0.5 flex items-center gap-1 text-[10px] font-medium text-slate-400"><Sparkles size={11} /> Gestão do negócio</p>
-          </div>
-        </div>
-        <div className="mt-3 flex items-center gap-2.5 rounded-xl border border-slate-200/70 bg-white px-3 py-2.5 shadow-sm">
-          <span className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-600">
-            {(displayName || ROLE_LABELS[role]).trim().charAt(0).toUpperCase()}
-          </span>
-          <div className="min-w-0">
-            <p className="truncate text-xs font-bold text-slate-800">{displayName || ROLE_LABELS[role]}</p>
-            <p className="mt-0.5 text-[11px] text-slate-400">{ROLE_LABELS[role]}</p>
-          </div>
+    <aside className="fixed inset-y-3 left-3 z-20 hidden w-[248px] flex-col rounded-[24px] border border-white/70 bg-white/60 px-3 py-4 shadow-[0_12px_40px_-16px_rgba(15,23,42,.18)] backdrop-blur-2xl dark:border-white/[.08] dark:bg-white/[.03] dark:shadow-none md:flex">
+      <div className="mb-3 flex items-center gap-3 px-2">
+        <BrandMark size={36} className="shadow-[0_8px_20px_-6px_rgba(47,91,246,.8)] rounded-[10px]" />
+        <div className="min-w-0">
+          <p className="truncate text-[14px] font-semibold text-slate-900">Cobrei</p>
+          <p className="mt-0.5 truncate text-[11px] text-slate-500">
+            {displayName ? `${displayName} · ${ROLE_LABELS[role]}` : ROLE_LABELS[role]}
+          </p>
         </div>
       </div>
 
-      <nav className="-mx-1 flex flex-1 flex-col gap-3 overflow-y-auto px-1 pb-2">
+      <nav className="-mx-3 flex flex-1 flex-col gap-3 overflow-y-auto px-3 pb-2">
         {sections.map((section) => {
           const isCollapsed = collapsed.includes(section.id) && !section.items.some(isActive);
           return (
@@ -139,15 +132,17 @@ export function Sidebar({
       {plan && (
         <Link
           href="/configuracoes#plano"
-          className={clsx("mb-2 block rounded-xl border px-3 py-2.5 transition hover:shadow-sm", planTone[plan.tone])}
+          className={clsx("mb-2 block rounded-2xl border px-3 py-2.5 transition hover:shadow-sm", planTone[plan.tone])}
         >
-          <p className="text-xs font-bold">{plan.label}</p>
+          <p className="flex items-center gap-1.5 text-xs font-semibold"><Sparkles size={12} /> {plan.label}</p>
           {plan.hint && <p className="mt-0.5 text-[11px] opacity-80">{plan.hint}</p>}
         </Link>
       )}
 
-      <button onClick={handleLogout} className="flex items-center gap-3 rounded-xl px-2.5 py-2 text-[13.5px] font-medium text-slate-500 transition hover:bg-white hover:text-danger hover:shadow-sm">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100"><LogOut size={17} /></span>
+      <ThemeSwitch className="mb-2" />
+
+      <button onClick={handleLogout} className="flex items-center gap-3 rounded-xl px-3 py-2 text-[13.5px] font-medium text-slate-500 transition hover:bg-white/70 hover:text-danger dark:text-slate-400 dark:hover:bg-white/[.06]">
+        <span className="flex h-7 w-7 items-center justify-center"><LogOut size={17} /></span>
         Sair
       </button>
     </aside>
