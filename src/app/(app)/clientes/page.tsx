@@ -9,14 +9,14 @@ import { FabButton } from "@/components/ui/FabButton";
 import { formatCurrency } from "@/utils/format";
 import { whatsappLink } from "@/utils/masks";
 import { buildChargeMessage, type ChargeInstallment } from "@/utils/charge-message";
+import { ShowMoreLink } from "@/components/ui/ShowMoreLink";
+import { LIST_PAGE_SIZE, visibleCount } from "@/lib/pagination";
 
 export const dynamic = "force-dynamic";
 
-export default async function ClientesPage({ searchParams }: { searchParams: { q?: string } }) {
+export default async function ClientesPage({ searchParams }: { searchParams: { q?: string; mostrar?: string } }) {
   const supabase = createClient();
-  const access = await getAccessContext();
   const query = searchParams.q?.trim() ?? "";
-  const canCreate = access?.role !== "cobrador";
 
   function customersQuery(from: number, to: number) {
     let builder = supabase.from("customers").select("id, name, phone, whatsapp, city");
@@ -24,26 +24,28 @@ export default async function ClientesPage({ searchParams }: { searchParams: { q
     return builder.order("name", { ascending: true }).order("id").range(from, to);
   }
 
-  const [{ data: customers }, { data: openInstallments }, { data: sales }] = await Promise.all([
+  // Parcelas em aberto já vêm com a venda; das demais vendas basta saber o cliente.
+  const [{ data: customers }, { data: openInstallments }, { data: sales }, access] = await Promise.all([
     fetchAll(customersQuery),
     fetchAll((from, to) =>
       supabase
         .from("installments")
-        .select("id, sale_id, installment_number, total_installments, amount, paid_amount, due_date, status")
+        .select("id, installment_number, total_installments, amount, paid_amount, due_date, status, sales!inner(customer_id, sale_number, is_opening_balance)")
         .in("status", ["pendente", "parcial", "vencido"])
+        .neq("sales.status", "cancelled")
         .order("id")
         .range(from, to)
     ),
     fetchAll((from, to) =>
-      supabase.from("sales").select("id, customer_id, sale_number, is_opening_balance").neq("status", "cancelled").order("id").range(from, to)
+      supabase.from("sales").select("customer_id").neq("status", "cancelled").not("customer_id", "is", null).order("id").range(from, to)
     ),
+    getAccessContext(),
   ]);
+  const canCreate = access?.role !== "cobrador";
 
-  const saleMap = new Map((sales ?? []).map((sale) => [sale.id, sale]));
   const customersWithPurchases = new Set((sales ?? []).map((sale) => sale.customer_id).filter(Boolean) as string[]);
   const chargesByCustomer = new Map<string, ChargeInstallment[]>();
-  (openInstallments ?? []).forEach((item) => {
-    const sale = saleMap.get(item.sale_id);
+  ((openInstallments ?? []) as any[]).forEach(({ sales: sale, ...item }) => {
     if (!sale?.customer_id) return;
     const charge: ChargeInstallment = {
       installmentNumber: item.installment_number,
@@ -54,8 +56,17 @@ export default async function ClientesPage({ searchParams }: { searchParams: { q
       status: item.status,
       isOpeningBalance: Boolean(sale.is_opening_balance),
     };
-    chargesByCustomer.set(sale.customer_id, [...(chargesByCustomer.get(sale.customer_id) ?? []), charge]);
+    const list = chargesByCustomer.get(sale.customer_id) ?? [];
+    list.push(charge);
+    chargesByCustomer.set(sale.customer_id, list);
   });
+
+  // A lista cresce sozinha ao rolar (ver ShowMoreLink), em vez de montar todos os clientes de uma vez.
+  const shownCount = visibleCount(searchParams.mostrar);
+  const visibleCustomers = (customers ?? []).slice(0, shownCount);
+  const moreParams = new URLSearchParams();
+  if (query) moreParams.set("q", query);
+  moreParams.set("mostrar", String(shownCount + LIST_PAGE_SIZE));
 
   return (
     <div className="space-y-4">
@@ -68,7 +79,7 @@ export default async function ClientesPage({ searchParams }: { searchParams: { q
         <EmptyState icon={Users} title={query ? "Nenhum cliente encontrado" : "Nenhum cliente cadastrado"} description={query ? "Tente buscar por outro nome." : "Cadastre seu primeiro cliente para começar a vender."} actionLabel={!query && canCreate ? "Novo cliente" : undefined} actionHref={!query && canCreate ? "/clientes/novo" : undefined} />
       ) : (
         <ul className="card divide-y divide-slate-100 !p-0 overflow-hidden">
-          {customers.map((c) => {
+          {visibleCustomers.map((c) => {
             const charges = chargesByCustomer.get(c.id) ?? [];
             const balance = charges.reduce((sum, item) => sum + item.openAmount, 0);
             const phone = c.whatsapp ?? c.phone;
@@ -95,6 +106,7 @@ export default async function ClientesPage({ searchParams }: { searchParams: { q
           })}
         </ul>
       )}
+      <ShowMoreLink href={`/clientes?${moreParams.toString()}`} remaining={(customers ?? []).length - visibleCustomers.length} shown={visibleCustomers.length} total={(customers ?? []).length} />
 
       {canCreate && <FabButton href="/clientes/novo" label="Novo cliente" />}
     </div>

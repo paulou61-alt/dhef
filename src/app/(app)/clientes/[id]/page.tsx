@@ -23,38 +23,34 @@ const STATUS_LABELS: Record<string, { label: string; className: string }> = {
 };
 
 export default async function CustomerDetailPage({ params, searchParams }: { params: { id: string }; searchParams?: { created?: string; desconto?: string } }) {
-  const access = await getAccessContext();
-  const canEditDueDates = access?.role === "owner";
   const supabase = createClient();
 
-  const { data: customer } = await supabase
-    .from("customers")
-    .select("*")
-    .eq("id", params.id)
-    .single();
+  // Tudo ao mesmo tempo: antes eram quatro consultas, uma esperando a outra.
+  // As parcelas vêm pelo cliente da venda, sem precisar esperar a lista de vendas.
+  const [access, { data: customer }, { data: sales }, { data: rawInstallments }, { data: discounts, error: discountsError }] = await Promise.all([
+    getAccessContext(),
+    supabase.from("customers").select("*").eq("id", params.id).single(),
+    supabase
+      .from("sales")
+      .select("id, sale_number, total, down_payment, created_at, payment_method, is_paid, status, is_opening_balance")
+      .eq("customer_id", params.id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("installments")
+      .select("id, sale_id, installment_number, total_installments, amount, paid_amount, due_date, status, sales!inner(customer_id)")
+      .eq("sales.customer_id", params.id)
+      .order("due_date", { ascending: true }),
+    supabase.from("customer_discounts")
+      .select("id, amount, note, created_at, reversed_at").eq("customer_id", params.id)
+      .order("created_at", { ascending: false }),
+  ]);
+  const canEditDueDates = access?.role === "owner";
 
   if (!customer) notFound();
 
-  const { data: sales } = await supabase
-    .from("sales")
-    .select("id, sale_number, total, down_payment, created_at, payment_method, is_paid, status, is_opening_balance")
-    .eq("customer_id", params.id)
-    .order("created_at", { ascending: false });
-
-  const saleIds = (sales ?? []).map((s) => s.id);
   const saleMap = new Map((sales ?? []).map((sale) => [sale.id, sale]));
+  const installments = ((rawInstallments ?? []) as any[]).map(({ sales: _sale, ...item }) => item);
 
-  const { data: installments } = saleIds.length
-    ? await supabase
-        .from("installments")
-        .select("id, sale_id, installment_number, total_installments, amount, paid_amount, due_date, status")
-        .in("sale_id", saleIds)
-        .order("due_date", { ascending: true })
-    : { data: [] as any[] };
-
-  const { data: discounts, error: discountsError } = await supabase.from("customer_discounts")
-    .select("id, amount, note, created_at, reversed_at").eq("customer_id", params.id)
-    .order("created_at", { ascending: false });
   const installmentSaleIds = new Set<string>((installments ?? []).map((item) => item.sale_id));
 
   const actualSales = (sales ?? []).filter((sale) => !sale.is_opening_balance);
