@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
+import { usePurchaseCatalog } from "@/components/sales/PurchaseCatalog";
 import { BadgeMinus, CloudOff, ShoppingBag } from "lucide-react";
 import { parseDiscountAmount } from "@/lib/customer-discounts";
 import { receiptBalance, suggestedReceiptAmount, validateReceiptAmounts } from "@/lib/receipt-discounts";
@@ -32,8 +33,8 @@ export function ReceiveButton({
   installmentId,
   openAmount,
   buttonLabel = "Receber",
-  products = [],
-  variants = [],
+  products: productsProp,
+  variants: variantsProp,
   successHref,
   collectors = [],
   defaultCollectorId = "",
@@ -42,6 +43,7 @@ export function ReceiveButton({
   installmentId: string;
   openAmount: number;
   buttonLabel?: string;
+  /** Sem estas listas, usa as do PurchaseCatalogProvider da página. */
   products?: PurchaseProduct[];
   variants?: PurchaseVariant[];
   /** Endereço aberto depois de salvar. Sem ele, a página atual é recarregada. */
@@ -53,6 +55,9 @@ export function ReceiveButton({
   /** Apenas o proprietário pode conceder descontos. */
   allowDiscount?: boolean;
 }) {
+  const catalog = usePurchaseCatalog();
+  const products = productsProp ?? catalog.products;
+  const variants = variantsProp ?? catalog.variants;
   const fieldId = useId();
   const [discount, setDiscount] = useState("");
   const [discountNote, setDiscountNote] = useState("");

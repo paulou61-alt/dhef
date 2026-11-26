@@ -4,6 +4,9 @@ import { CheckCircle2, Filter, MapPin, MessageCircle, WalletCards } from "lucide
 import { createClient } from "@/lib/supabase/server";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { getAccessContext } from "@/lib/access";
+import { PurchaseCatalogProvider } from "@/components/sales/PurchaseCatalog";
+import { ShowMoreLink } from "@/components/ui/ShowMoreLink";
+import { LIST_PAGE_SIZE, visibleCount } from "@/lib/pagination";
 import { ReceiveButton } from "@/components/finance/ReceiveButton";
 import { CollaboratorFilterSelect } from "@/components/finance/CollaboratorFilterSelect";
 import { formatCurrency, formatDate, todayInBrazil } from "@/utils/format";
@@ -17,7 +20,7 @@ const OPEN_STATUSES = new Set(["pendente", "parcial", "vencido"]);
 export default async function CobrancasPage({
   searchParams,
 }: {
-  searchParams: { status?: string; colaborador?: string };
+  searchParams: { status?: string; colaborador?: string; mostrar?: string };
 }) {
   const access = await getAccessContext();
   if (!access) redirect("/login");
@@ -116,11 +119,20 @@ export default async function CobrancasPage({
     0
   );
 
+  // Mostra os primeiros clientes e um "Mostrar mais"; os totais acima continuam com todos.
+  const shownCount = visibleCount(searchParams.mostrar);
+  const activeList = activeFilter === "pagos" ? paidAccounts : debtors;
+  const moreParams = new URLSearchParams();
+  if (activeFilter === "pagos") moreParams.set("status", "pagos");
+  if (selectedCollaboratorId) moreParams.set("colaborador", selectedCollaboratorId);
+  moreParams.set("mostrar", String(shownCount + LIST_PAGE_SIZE));
+
   const collaboratorQuery = selectedCollaboratorId
     ? `&colaborador=${encodeURIComponent(selectedCollaboratorId)}`
     : "";
 
   return (
+    <PurchaseCatalogProvider products={(products ?? []) as any} variants={(variants ?? []) as any}>
     <div className="space-y-4">
       <div className={`card flex items-center justify-between gap-3 ${activeFilter === "pagos" ? "border border-success/20 bg-success/5" : ""}`}>
         <div>
@@ -174,7 +186,7 @@ export default async function CobrancasPage({
       {activeFilter === "devedores" ? (
         debtors.length === 0 ? (
           <div className="card py-12 text-center text-sm text-slate-500">Nenhuma cobrança pendente para este filtro.</div>
-        ) : debtors.map(({ customer, openItems }) => {
+        ) : debtors.slice(0, shownCount).map(({ customer, openItems }) => {
           const openTotal = openItems.reduce((sum, item) => sum + Number(item.amount) - Number(item.paid_amount), 0);
           const phone = customer.whatsapp ?? customer.phone;
           const addressParts = [customer.address, customer.neighborhood, customer.city, customer.state, customer.zip_code].filter(Boolean);
@@ -235,8 +247,6 @@ export default async function CobrancasPage({
                         installmentId={item.id}
                         openAmount={open}
                         buttonLabel={item.isOpeningBalance ? "Receber saldo" : `Pagar ${item.installment_number}/${item.total_installments}`}
-                        products={(products ?? []) as any}
-                        variants={(variants ?? []) as any}
                         allowDiscount={access?.role === "owner"}
                         collectors={collectors}
                         defaultCollectorId={customer.assigned_collaborator_id ?? ""}
@@ -263,7 +273,7 @@ export default async function CobrancasPage({
         })
       ) : paidAccounts.length === 0 ? (
         <div className="card py-12 text-center text-sm text-slate-500">Nenhum cliente quitado para este filtro.</div>
-      ) : paidAccounts.map(({ customer, items }) => {
+      ) : paidAccounts.slice(0, shownCount).map(({ customer, items }) => {
         const paidTotal = items.reduce((sum, item) => sum + Number(item.paid_amount), 0);
         return (
           <div key={customer.id} className="card border border-success/20 bg-success/5">
@@ -303,6 +313,9 @@ export default async function CobrancasPage({
           </div>
         );
       })}
+
+      <ShowMoreLink href={`/cobrancas?${moreParams.toString()}`} remaining={activeList.length - Math.min(shownCount, activeList.length)} shown={Math.min(shownCount, activeList.length)} total={activeList.length} />
     </div>
+    </PurchaseCatalogProvider>
   );
 }

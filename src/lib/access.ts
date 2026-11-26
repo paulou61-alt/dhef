@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { ALL_VIEW_PERMISSIONS, normalizeViewPermissions, type ViewPermission } from "@/lib/permissions";
 
@@ -12,7 +13,13 @@ export interface AccessContext {
   viewPermissions: ViewPermission[];
 }
 
-export async function getAccessContext(): Promise<AccessContext | null> {
+/**
+ * Quem está usando o app. Guardado durante a requisição: o layout e a página
+ * pedem a mesma informação, e cada pedido era uma ida ao Supabase.
+ */
+export const getAccessContext = cache(loadAccessContext);
+
+async function loadAccessContext(): Promise<AccessContext | null> {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;

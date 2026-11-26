@@ -79,7 +79,8 @@ export default async function FichasPage({ searchParams }: { searchParams: Searc
     fetchAll((from, to) =>
       supabase.from("sales").select("id, customer_id, total, status, is_opening_balance").eq("status", "completed").order("id").range(from, to)
     ),
-    fetchAll((from, to) => supabase.from("installments").select("sale_id, amount, paid_amount, status").order("id").range(from, to)),
+    // Parcelas pagas não mudam o saldo: só as demais vêm do banco.
+    fetchAll((from, to) => supabase.from("installments").select("sale_id, amount, paid_amount, status").neq("status", "pago").order("id").range(from, to)),
   ]);
 
   const collaboratorMap = new Map((collaborators ?? []).map((c) => [c.id, c]));
@@ -114,7 +115,9 @@ export default async function FichasPage({ searchParams }: { searchParams: Searc
   // Fichas ativas primeiro; as quitadas vão para o fim de cada grupo.
   [...(customers ?? [])].sort((a, b) => Number(isReleased(a.id)) - Number(isReleased(b.id))).forEach((customer) => {
     const key = customer.assigned_collaborator_id ?? "sem";
-    grouped.set(key, [...(grouped.get(key) ?? []), customer]);
+    const list = grouped.get(key) ?? [];
+    list.push(customer);
+    grouped.set(key, list);
   });
 
   const groupKeys = Array.from(grouped.keys()).sort((a, b) => {

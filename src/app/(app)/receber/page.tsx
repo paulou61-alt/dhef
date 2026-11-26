@@ -4,6 +4,9 @@ import { fetchAll } from "@/lib/supabase/fetch-all";
 import { ReceiveButton } from "@/components/finance/ReceiveButton";
 import { getAccessContext } from "@/lib/access";
 import { CollaboratorFilterSelect } from "@/components/finance/CollaboratorFilterSelect";
+import { PurchaseCatalogProvider } from "@/components/sales/PurchaseCatalog";
+import { ShowMoreLink } from "@/components/ui/ShowMoreLink";
+import { LIST_PAGE_SIZE, visibleCount } from "@/lib/pagination";
 import { formatCurrency, formatDate } from "@/utils/format";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +25,7 @@ type CustomerSummary = {
   whatsapp: string | null;
   ficha_number: number | null;
   assigned_collaborator_id: string | null;
+  write_off_status?: string | null;
 };
 
 type DebtInstallment = {
@@ -66,52 +70,51 @@ function normalizeSearch(value: string) {
 export default async function ReceberPage({
   searchParams,
 }: {
-  searchParams?: { q?: string; colaborador?: string; aberto?: string };
+  searchParams?: { q?: string; colaborador?: string; aberto?: string; mostrar?: string };
 }) {
   const supabase = createClient();
+  // Só as parcelas em aberto, já com a venda e o cliente de cada uma.
+  // Antes a tela baixava todas as vendas e todos os clientes já cadastrados.
   const [
     { data: installments },
-    { data: sales },
-    { data: customers },
     { data: collaborators },
     { data: products },
     { data: variants },
+    access,
   ] = await Promise.all([
     fetchAll((from, to) =>
-      supabase.from("installments").select("*").in("status", ["pendente", "parcial", "vencido"]).order("due_date").order("id").range(from, to)
-    ),
-    fetchAll((from, to) => supabase.from("sales").select("id, customer_id, sale_number, is_opening_balance").order("id").range(from, to)),
-    fetchAll((from, to) =>
-      supabase.from("customers").select("*").order("id").range(from, to)
+      supabase
+        .from("installments")
+        .select(
+          "id, sale_id, amount, paid_amount, due_date, installment_number, total_installments, status, " +
+            "sales(id, customer_id, sale_number, is_opening_balance, customers(id, name, phone, whatsapp, ficha_number, assigned_collaborator_id, write_off_status))"
+        )
+        .in("status", ["pendente", "parcial", "vencido"])
+        .order("due_date")
+        .order("id")
+        .range(from, to)
     ),
     supabase.from("collaborators").select("id, name, role, is_active").order("name"),
     fetchAll((from, to) => supabase.from("products").select("id, name, sale_price").eq("is_active", true).order("name").order("id").range(from, to)),
     fetchAll((from, to) =>
       supabase.from("product_variants").select("id, product_id, variant_name, stock_quantity, sale_price").order("variant_name").order("id").range(from, to)
     ),
+    getAccessContext(),
   ]);
 
   // "Quem cobrou" no recebimento: só o proprietário escolhe, entre os cobradores ativos.
-  const access = await getAccessContext();
   const collectors = access?.role === "owner"
     ? (collaborators ?? []).filter((collaborator) => collaborator.role === "cobrador" && collaborator.is_active).map(({ id, name }) => ({ id, name }))
     : [];
 
-  const saleMap = new Map<string, SaleSummary>(
-    (sales ?? []).map((sale) => [sale.id, sale as SaleSummary]),
-  );
-  const customerMap = new Map<string, CustomerSummary>(
-    (customers ?? []).map((customer) => [customer.id, customer as CustomerSummary]),
-  );
-
   const debtorMap = new Map<string, Debtor>();
 
-  for (const rawInstallment of installments ?? []) {
-    const item = rawInstallment as DebtInstallment;
-    const sale = saleMap.get(item.sale_id);
-    const customer = sale?.customer_id ? customerMap.get(sale.customer_id) ?? null : null;
+  for (const rawInstallment of (installments ?? []) as any[]) {
+    const { sales: rawSale, ...item } = rawInstallment as DebtInstallment & { sales: (SaleSummary & { customers: CustomerSummary | null }) | null };
+    const sale: SaleSummary | undefined = rawSale ? { id: rawSale.id, customer_id: rawSale.customer_id, sale_number: rawSale.sale_number, is_opening_balance: rawSale.is_opening_balance } : undefined;
+    const customer = rawSale?.customers ?? null;
     // Clientes marcados como prego ou mudou saem da lista de recebimentos.
-    if ((customer as { write_off_status?: string | null } | null)?.write_off_status) continue;
+    if (customer?.write_off_status) continue;
     const key = customer?.id ?? `sem-cliente-${item.sale_id}`;
     const open = Math.max(0, Number(item.amount) - Number(item.paid_amount ?? 0));
 
@@ -166,7 +169,10 @@ export default async function ReceberPage({
 
   // Depois de um recebimento, a ficha do cliente volta aberta no mesmo lugar.
   const openKey = searchParams?.aberto ?? "";
-  const paidOffCustomer = openKey && !debtorMap.has(openKey) ? customerMap.get(openKey) ?? null : null;
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const paidOffCustomer = openKey && !debtorMap.has(openKey) && uuid.test(openKey)
+    ? (await supabase.from("customers").select("id, name, ficha_number").eq("id", openKey).maybeSingle()).data
+    : null;
 
   function successHrefFor(key: string) {
     const params = new URLSearchParams();
@@ -175,6 +181,16 @@ export default async function ReceberPage({
     params.set("aberto", key);
     return `/receber?${params.toString()}#ficha-${key}`;
   }
+
+  // Listas grandes travavam o celular: mostra os primeiros e um "Mostrar mais".
+  // A ficha que acabou de receber um pagamento continua visível.
+  const openIndex = openKey ? filteredDebtors.findIndex((debtor) => debtor.key === openKey) : -1;
+  const shownCount = Math.max(visibleCount(searchParams?.mostrar), openIndex + 1);
+  const visibleDebtors = filteredDebtors.slice(0, shownCount);
+  const moreParams = new URLSearchParams();
+  if (rawQuery) moreParams.set("q", rawQuery);
+  if (collaboratorFilter) moreParams.set("colaborador", collaboratorFilter);
+  moreParams.set("mostrar", String(shownCount + LIST_PAGE_SIZE));
 
   const totalOpen = filteredDebtors.reduce((sum, debtor) => sum + debtor.total, 0);
   const totalInstallments = filteredDebtors.reduce((sum, debtor) => sum + debtor.items.length, 0);
@@ -258,6 +274,7 @@ export default async function ReceberPage({
           <p className="mt-1 text-xs text-slate-500">Tente pesquisar por outro número de ficha ou nome.</p>
         </div>
       ) : (
+        <PurchaseCatalogProvider products={(products ?? []) as any} variants={(variants ?? []) as any}>
         <div className="card overflow-hidden !p-0">
           <div className="border-b border-slate-100 px-4 py-3">
             <p className="text-sm font-semibold text-slate-800">Clientes devendo por número de ficha</p>
@@ -265,7 +282,7 @@ export default async function ReceberPage({
           </div>
 
           <div className="divide-y divide-slate-100">
-            {filteredDebtors.map((debtor) => {
+            {visibleDebtors.map((debtor) => {
               const customerName = debtor.customer?.name ?? "Cliente não informado";
               const initial = customerName.trim().charAt(0).toUpperCase() || "?";
 
@@ -348,8 +365,6 @@ export default async function ReceberPage({
                             <ReceiveButton
                               installmentId={item.id}
                               openAmount={open}
-                              products={(products ?? []) as any}
-                              variants={(variants ?? []) as any}
                               successHref={successHrefFor(debtor.key)}
                               allowDiscount={access?.role === "owner"}
                               collectors={collectors}
@@ -365,6 +380,8 @@ export default async function ReceberPage({
             })}
           </div>
         </div>
+        <ShowMoreLink href={`/receber?${moreParams.toString()}`} remaining={filteredDebtors.length - visibleDebtors.length} shown={visibleDebtors.length} total={filteredDebtors.length} />
+        </PurchaseCatalogProvider>
       )}
     </div>
   );
