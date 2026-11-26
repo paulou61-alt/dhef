@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { ALL_FEATURES, PLANS, TRIAL_COLLABORATOR_LIMIT, type Feature, type PlanId } from "@/lib/billing/plans";
 import { getAccessContext, type AccessContext } from "@/lib/access";
@@ -18,7 +19,10 @@ export interface Subscription {
 // Status do Stripe que mantêm o acesso. past_due continua liberado enquanto o Stripe tenta cobrar de novo.
 const ACTIVE_STRIPE_STATUSES = new Set(["active", "trialing", "past_due"]);
 
-export async function getSubscription(access: AccessContext): Promise<Subscription | null> {
+/** Guardada durante a requisição: o layout e as telas com plano pedem a mesma assinatura. */
+export const getSubscription = cache(loadSubscription);
+
+async function loadSubscription(access: AccessContext): Promise<Subscription | null> {
   const supabase = createClient();
   const select = () =>
     supabase

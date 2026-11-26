@@ -15,41 +15,46 @@ import { InstallmentDueDateEditor } from "@/components/customers/InstallmentDueD
 export const dynamic = "force-dynamic";
 
 export default async function FichaClientePage({ params }: { params: { id: string } }) {
-  const access = await getAccessContext();
-  if (!access) redirect("/login");
-
   const supabase = createClient();
-  const { data: customer } = await supabase.from("customers").select("*").eq("id", params.id).single();
+  const strip = (rows: any[] | null) => (rows ?? []).map(({ sales: _sale, installments: _installment, ...row }) => row);
+
+  // Tudo ao mesmo tempo: antes eram cinco rodadas de consultas, uma esperando a outra.
+  // Itens, parcelas e pagamentos vêm filtrados pelo cliente da venda.
+  const [access, { data: customer }, { data: sales }, { data: rawItems }, { data: rawInstallments }, { data: rawPayments }, { data: discounts, error: discountsError }] = await Promise.all([
+    getAccessContext(),
+    supabase.from("customers").select("*").eq("id", params.id).single(),
+    supabase.from("sales").select("*").eq("customer_id", params.id).eq("status", "completed").order("created_at", { ascending: false }),
+    supabase.from("sale_items").select("*, sales!inner(customer_id, status)").eq("sales.customer_id", params.id).eq("sales.status", "completed").order("created_at"),
+    supabase.from("installments").select("*, sales!inner(customer_id, status)").eq("sales.customer_id", params.id).eq("sales.status", "completed").order("due_date"),
+    supabase
+      .from("payments")
+      .select("*, installments!inner(sales!inner(customer_id, status))")
+      .eq("installments.sales.customer_id", params.id)
+      .eq("installments.sales.status", "completed")
+      .order("payment_date", { ascending: false }),
+    supabase.from("customer_discounts")
+      .select("id, amount, note, created_at, reversed_at").eq("customer_id", params.id)
+      .order("created_at", { ascending: false }),
+  ]);
+  if (!access) redirect("/login");
   if (!customer) notFound();
   if (access.role !== "owner" && customer.assigned_collaborator_id !== access.collaboratorId) notFound();
 
-  const [{ data: responsible }, { data: sales }] = await Promise.all([
-    customer.assigned_collaborator_id
-      ? supabase.from("collaborators").select("id, name, role").eq("id", customer.assigned_collaborator_id).maybeSingle()
-      : Promise.resolve({ data: null } as any),
-    supabase.from("sales").select("*").eq("customer_id", params.id).eq("status", "completed").order("created_at", { ascending: false }),
-  ]);
+  const { data: responsible } = customer.assigned_collaborator_id
+    ? await supabase.from("collaborators").select("id, name, role").eq("id", customer.assigned_collaborator_id).maybeSingle()
+    : { data: null as any };
+  const items = strip(rawItems);
+  const installments = strip(rawInstallments);
+  const payments = strip(rawPayments);
 
-  const saleIds = (sales ?? []).map((s) => s.id);
-  const [{ data: items }, { data: installments }] = saleIds.length
-    ? await Promise.all([
-        supabase.from("sale_items").select("*").in("sale_id", saleIds).order("created_at"),
-        supabase.from("installments").select("*").in("sale_id", saleIds).order("due_date"),
-      ])
-    : [{ data: [] as any[] }, { data: [] as any[] }];
-
-  const installmentIds = (installments ?? []).map((i) => i.id);
-  const { data: payments } = installmentIds.length
-    ? await supabase.from("payments").select("*").in("installment_id", installmentIds).order("payment_date", { ascending: false })
-    : { data: [] as any[] };
-
-  const { data: discounts, error: discountsError } = await supabase.from("customer_discounts")
-    .select("id, amount, note, created_at, reversed_at").eq("customer_id", params.id)
-    .order("created_at", { ascending: false });
   const installmentSaleIds = new Set<string>((installments ?? []).map((item) => item.sale_id));
 
   const itemsBySale = new Map<string, any[]>();
-  (items ?? []).forEach((item) => itemsBySale.set(item.sale_id, [...(itemsBySale.get(item.sale_id) ?? []), item]));
+  items.forEach((item) => {
+    const list = itemsBySale.get(item.sale_id) ?? [];
+    list.push(item);
+    itemsBySale.set(item.sale_id, list);
+  });
   const installmentsBySale = new Map<string, any[]>();
   (installments ?? []).forEach((item) => installmentsBySale.set(item.sale_id, [...(installmentsBySale.get(item.sale_id) ?? []), item]));
   const paymentsByInstallment = new Map<string, any[]>();

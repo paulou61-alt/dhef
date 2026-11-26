@@ -14,7 +14,8 @@ export default async function FinanceiroPage() {
     // A lista mostra só as 200 mais recentes; os totais usam todas as movimentações.
     supabase.from("cash_movements").select("*").order("created_at", { ascending: false }).limit(200),
     fetchAll((from, to) => supabase.from("cash_movements").select("type, amount").order("id").range(from, to)),
-    fetchAll((from, to) => supabase.from("installments").select("amount, paid_amount, status").order("id").range(from, to)),
+    // Parcelas pagas não entram no "A receber": nem vêm do banco.
+    fetchAll((from, to) => supabase.from("installments").select("amount, paid_amount, status").neq("status", "pago").order("id").range(from, to)),
     fetchAll((from, to) => supabase.from("sale_items").select("quantity, unit_cost_snapshot, unit_price_snapshot").order("id").range(from, to)),
   ]);
 

@@ -28,23 +28,24 @@ export default async function CobrancasPage({
 
   const activeFilter = searchParams.status === "pagos" ? "pagos" : "devedores";
   const supabase = createClient();
+  // Uma consulta só: cada parcela já vem com a venda e o cliente, e só as colunas usadas.
+  // Antes eram três tabelas inteiras (todas as parcelas, vendas e clientes, com todas as colunas).
   const [
     { data: installments },
-    { data: sales },
-    { data: customers },
     { data: collaborators },
     { data: products },
     { data: variants },
   ] = await Promise.all([
-    fetchAll((from, to) => supabase.from("installments").select("*").order("due_date").order("id").range(from, to)),
-    fetchAll((from, to) =>
-      supabase.from("sales").select("id, customer_id, sale_number, is_opening_balance").neq("status", "cancelled").order("id").range(from, to)
-    ),
     fetchAll((from, to) =>
       supabase
-        .from("customers")
-        .select("*")
-        .order("ficha_number")
+        .from("installments")
+        .select(
+          "id, sale_id, amount, paid_amount, due_date, installment_number, total_installments, status, " +
+            "sales!inner(id, customer_id, sale_number, is_opening_balance, " +
+            "customers!inner(id, name, ficha_number, phone, whatsapp, address, neighborhood, city, state, zip_code, assigned_collaborator_id, write_off_status))"
+        )
+        .neq("sales.status", "cancelled")
+        .order("due_date")
         .order("id")
         .range(from, to)
     ),
@@ -67,15 +68,11 @@ export default async function CobrancasPage({
     ? activeCollaborators.filter((collaborator) => collaborator.role === "cobrador").map(({ id, name }) => ({ id, name }))
     : [];
 
-  const saleMap = new Map((sales ?? []).map((sale) => [sale.id, sale]));
-  const customerMap = new Map((customers ?? []).map((customer) => [customer.id, customer]));
   const grouped = new Map<string, { customer: any; items: any[] }>();
 
-  (installments ?? []).forEach((installment) => {
-    const sale = saleMap.get(installment.sale_id);
-    if (!sale?.customer_id) return;
-    const customer = customerMap.get(sale.customer_id);
-    if (!customer) return;
+  ((installments ?? []) as any[]).forEach(({ sales: sale, ...installment }) => {
+    const customer = sale?.customers;
+    if (!sale?.customer_id || !customer) return;
     // Clientes marcados como prego ou mudou saem das cobranças.
     if (customer.write_off_status) return;
     if (selectedCollaboratorId && customer.assigned_collaborator_id !== selectedCollaboratorId) return;
