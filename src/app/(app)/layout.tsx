@@ -31,7 +31,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <GlassSpotlight />
       <Sidebar role={access.role} displayName={access.name} viewPermissions={access.viewPermissions} lockedFeatures={lockedFeatures} plan={plan} />
       <OfflineStatus userId={access.userId} />
-      <div className="relative z-10 md:pl-[272px]">
+      <div className="relative md:pl-[272px]">
         <Header role={access.role} lockedFeatures={lockedFeatures} />
         {daysLeft !== null && (
           <Link
