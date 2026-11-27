@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
+import { createPortal } from "react-dom";
 import { usePurchaseCatalog } from "@/components/sales/PurchaseCatalog";
 import { BadgeMinus, CloudOff, ShoppingBag } from "lucide-react";
 import { parseDiscountAmount } from "@/lib/customer-discounts";
@@ -170,8 +171,9 @@ export function ReceiveButton({
         {notice && <span className="max-w-[240px] rounded-lg bg-amber-50 px-2 py-1 text-right text-[10px] font-medium text-amber-800"><CloudOff size={11} className="mr-1 inline" />{notice}</span>}
       </div>
 
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-0 sm:items-center sm:p-4">
+      {/* A janela vai direto no <body>: dentro de um cartão de vidro ela ficava presa e cortada no cartão. */}
+      {open && createPortal(
+        <div className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-900/40 p-0 sm:items-center sm:p-4">
           <div role="dialog" aria-modal="true" aria-labelledby={`${fieldId}-title`} className="max-h-[92dvh] w-full max-w-xl overflow-y-auto rounded-t-2xl bg-white p-5 shadow-floating sm:rounded-2xl">
             <div className="mb-4">
               <h2 id={`${fieldId}-title`} className="text-lg font-bold text-slate-900">Registrar recebimento</h2>
@@ -321,7 +323,7 @@ export function ReceiveButton({
             </fieldset>
           </div>
         </div>
-      )}
+      , document.body)}
     </>
   );
 }

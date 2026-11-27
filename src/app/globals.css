@@ -315,3 +315,23 @@
     animation-duration: 0.01s;
   }
 }
+
+/*
+ * Lista de seleção aberta dentro de um cartão: o cartão deixa de cortar o
+ * conteúdo e sobe acima dos cartões seguintes, para a lista não ficar por trás.
+ */
+.glass:has([data-select-open]),
+.card:has([data-select-open]) {
+  position: relative;
+  z-index: 40;
+  overflow: visible;
+}
+
+/* Janelas e listas abertas precisam de fundo sólido também no tema escuro. */
+.dark .popover-surface,
+.dark [role="dialog"].bg-white,
+.dark [role="dialog"] > .bg-white,
+.dark [role="dialog"] .sticky.bg-white\/95 {
+  background-color: #0f1530;
+  border-color: rgba(255, 255, 255, 0.1);
+}

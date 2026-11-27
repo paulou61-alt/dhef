@@ -195,6 +195,8 @@ export function SelectField({
   return (
     <div
       ref={rootRef}
+      // Avisa o cartão em volta (ver globals.css) para não cortar a lista aberta.
+      data-select-open={open ? "true" : undefined}
       className={`relative ${className}`}
       onKeyDown={handleKeyDown}
       onBlur={(event) => {
@@ -236,7 +238,7 @@ export function SelectField({
       </button>
 
       {open && (
-        <div className="absolute left-0 right-0 z-[70] mt-2 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_18px_50px_-12px_rgba(15,23,42,0.28)]">
+        <div className="popover-surface absolute left-0 right-0 z-[70] mt-2 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_18px_50px_-12px_rgba(15,23,42,0.28)]">
           {searchable && (
             <div className="border-b border-slate-100 p-2.5">
               <div className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 ring-1 ring-inset ring-slate-200 focus-within:ring-2 focus-within:ring-brand-500/40">

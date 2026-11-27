@@ -312,7 +312,7 @@ export default async function ReceberPage({
                     <ChevronRight size={17} className="flex-none text-slate-300 transition-transform group-open:rotate-90 group-hover:text-brand-500" />
                   </summary>
 
-                  <div className="border-t border-slate-100 bg-slate-50/60 px-4 py-4 md:px-5">
+                  <div className="border-t border-slate-100 bg-slate-50/60 px-4 py-4 dark:!bg-white/[.02] md:px-5">
                     <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
                       {[
                         ["Ficha", `#${debtor.customer?.ficha_number ?? "-"}`],
