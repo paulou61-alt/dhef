@@ -1,6 +1,7 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { usePurchaseCatalog } from "@/components/sales/PurchaseCatalog";
 import { BadgeMinus, CloudOff, ShoppingBag } from "lucide-react";
 import { parseDiscountAmount } from "@/lib/customer-discounts";
@@ -78,6 +79,39 @@ export function ReceiveButton({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const scrollX = window.scrollX;
+    const scrollY = window.scrollY;
+    const previousBodyStyles = {
+      overflow: document.body.style.overflow,
+      position: document.body.style.position,
+      top: document.body.style.top,
+      left: document.body.style.left,
+      width: document.body.style.width,
+    };
+    const previousRootOverflow = document.documentElement.style.overflow;
+    // Mantém a ficha no mesmo lugar, inclusive nos navegadores de celular.
+    Object.assign(document.body.style, {
+      overflow: "hidden",
+      position: "fixed",
+      top: `-${scrollY}px`,
+      left: `-${scrollX}px`,
+      width: "100%",
+    });
+    document.documentElement.style.overflow = "hidden";
+    dialogRef.current?.focus({ preventScroll: true });
+
+    return () => {
+      Object.assign(document.body.style, previousBodyStyles);
+      document.documentElement.style.overflow = previousRootOverflow;
+      window.scrollTo({ left: scrollX, top: scrollY, behavior: "instant" });
+      previousFocus?.focus({ preventScroll: true });
+    };
+  }, [open]);
 
   const parsedAmount = parseDiscountAmount(amount);
   const parsedDiscount = allowDiscount && discount.trim() ? parseDiscountAmount(discount) : 0;
@@ -170,9 +204,17 @@ export function ReceiveButton({
         {notice && <span className="max-w-[240px] rounded-lg bg-amber-50 px-2 py-1 text-right text-[10px] font-medium text-amber-800"><CloudOff size={11} className="mr-1 inline" />{notice}</span>}
       </div>
 
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-0 sm:items-center sm:p-4">
-          <div role="dialog" aria-modal="true" aria-labelledby={`${fieldId}-title`} className="max-h-[92dvh] w-full max-w-xl overflow-y-auto rounded-t-2xl bg-white p-5 shadow-floating sm:rounded-2xl">
+      {open && createPortal(
+        <div
+          className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-900/40 p-0 sm:items-center sm:p-4"
+          onKeyDown={(event) => {
+            if (event.key === "Escape" && !event.defaultPrevented && !pending) {
+              event.preventDefault();
+              setOpen(false);
+            }
+          }}
+        >
+          <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby={`${fieldId}-title`} className="max-h-[92dvh] w-full max-w-xl overflow-y-auto overscroll-contain rounded-t-2xl bg-white p-5 shadow-floating outline-none sm:rounded-2xl">
             <div className="mb-4">
               <h2 id={`${fieldId}-title`} className="text-lg font-bold text-slate-900">Registrar recebimento</h2>
               <p className="text-sm text-slate-500">Saldo atual: {formatCurrency(openAmount)}</p>
@@ -320,7 +362,8 @@ export function ReceiveButton({
               </div>
             </fieldset>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
