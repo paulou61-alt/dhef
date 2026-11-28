@@ -220,7 +220,7 @@ export default async function ReceberPage({
         </div>
       </section>
 
-      <section className="glass animate-rise p-4 md:p-5" style={{ animationDelay: "160ms" }}>
+      <section className="glass animate-rise z-20 !overflow-visible p-4 md:p-5" style={{ animationDelay: "160ms" }}>
         <form method="get" className="grid gap-3 md:grid-cols-[1fr_260px_auto] md:items-end">
           <div className="min-w-0">
             <label htmlFor="busca-ficha" className="label">Pesquisar ficha</label>
