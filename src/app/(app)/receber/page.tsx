@@ -182,7 +182,8 @@ export default async function ReceberPage({
     if (rawQuery) params.set("q", rawQuery);
     if (collaboratorFilter) params.set("colaborador", collaboratorFilter);
     params.set("aberto", key);
-    return `/receber?${params.toString()}#ficha-${key}`;
+    params.set("mostrar", String(shownCount));
+    return `/receber?${params.toString()}`;
   }
 
   // Listas grandes travavam o celular: mostra os primeiros e um "Mostrar mais".
@@ -193,6 +194,7 @@ export default async function ReceberPage({
   const moreParams = new URLSearchParams();
   if (rawQuery) moreParams.set("q", rawQuery);
   if (collaboratorFilter) moreParams.set("colaborador", collaboratorFilter);
+  if (openKey) moreParams.set("aberto", openKey);
   moreParams.set("mostrar", String(shownCount + LIST_PAGE_SIZE));
 
   const totalOpen = filteredDebtors.reduce((sum, debtor) => sum + debtor.total, 0);

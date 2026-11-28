@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import { usePurchaseCatalog } from "@/components/sales/PurchaseCatalog";
 import { BadgeMinus, CloudOff, ShoppingBag } from "lucide-react";
 import { parseDiscountAmount } from "@/lib/customer-discounts";
@@ -56,6 +57,8 @@ export function ReceiveButton({
   /** Apenas o proprietário pode conceder descontos. */
   allowDiscount?: boolean;
 }) {
+  const router = useRouter();
+  const [refreshing, startRefresh] = useTransition();
   const catalog = usePurchaseCatalog();
   const products = productsProp ?? catalog.products;
   const variants = variantsProp ?? catalog.variants;
@@ -173,8 +176,14 @@ export function ReceiveButton({
         setOpen(false);
         resetPurchase();
         if (result.warning) window.alert(result.warning);
-        if (successHref) window.location.href = successHref;
-        else window.location.reload();
+        if (successHref) {
+          startRefresh(() => {
+            router.replace(successHref, { scroll: false });
+            router.refresh();
+          });
+        } else {
+          window.location.reload();
+        }
         return;
       }
 
@@ -200,7 +209,7 @@ export function ReceiveButton({
   return (
     <>
       <div className="flex flex-col items-end gap-1.5">
-        <button type="button" onClick={() => { setAmount(openAmount.toFixed(2).replace(".", ",")); setDiscount(""); setDiscountNote(""); setError(null); setOpen(true); }} className="whitespace-nowrap rounded-xl bg-gradient-to-b from-brand-400 to-brand-500 px-3.5 py-2 text-xs font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,.18),0_6px_16px_-6px_rgba(47,91,246,.7)] transition hover:-translate-y-0.5">{buttonLabel}</button>
+        <button type="button" disabled={pending || refreshing} onClick={() => { setAmount(openAmount.toFixed(2).replace(".", ",")); setDiscount(""); setDiscountNote(""); setError(null); setOpen(true); }} className="whitespace-nowrap rounded-xl bg-gradient-to-b from-brand-400 to-brand-500 px-3.5 py-2 text-xs font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,.18),0_6px_16px_-6px_rgba(47,91,246,.7)] transition hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-60">{refreshing ? "Atualizando..." : buttonLabel}</button>
         {notice && <span className="max-w-[240px] rounded-lg bg-amber-50 px-2 py-1 text-right text-[10px] font-medium text-amber-800"><CloudOff size={11} className="mr-1 inline" />{notice}</span>}
       </div>
 
